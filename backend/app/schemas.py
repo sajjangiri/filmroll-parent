@@ -15,6 +15,7 @@ class FilmCreate(BaseModel):
     # Requests above the free cap are accepted and then clamped. The host
     # raises the real cap through Checkout, not through this field.
     guest_cap: int = Field(default=5, ge=1, le=1000)
+    host_email: str | None = Field(default=None, max_length=254)
 
     @field_validator("reveal_at")
     @classmethod
@@ -43,6 +44,7 @@ class FilmPublic(BaseModel):
     guest_cap: int
     entitled_guest_cap: int
     keep_forever: bool
+    unlimited_shots: bool
     storage_until: datetime
     guest_count: int
     shot_count: int
@@ -62,6 +64,7 @@ class FilmUpdate(BaseModel):
     reveal_at: datetime | None = None
     shot_limit: int | None = Field(default=None, ge=1, le=500)
     guest_cap: int | None = Field(default=None, ge=1, le=1000)
+    host_email: str | None = Field(default=None, max_length=254)
 
 
 class FilmCreated(BaseModel):
@@ -168,3 +171,18 @@ class CheckoutResponse(BaseModel):
     url: str
     fake: bool = False
     amount_cents: int
+
+
+class HostAccount(BaseModel):
+    """Host-only. The public film payload never includes the email."""
+
+    email: str | None
+    unlimited_shots: bool
+
+
+class RecoverRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=254)
+
+
+class MagicSessionRequest(BaseModel):
+    magic_token: str = Field(min_length=20, max_length=2000)

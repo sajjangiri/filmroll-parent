@@ -37,7 +37,8 @@ export function Camera({
     },
   });
 
-  const left = Math.max((remaining ?? film.shot_limit) - waiting, 0);
+  const unlimited = film.unlimited_shots;
+  const left = unlimited ? 9999 : Math.max((remaining ?? film.shot_limit) - waiting, 0);
 
   useEffect(() => {
     let stream: MediaStream | undefined;
@@ -107,7 +108,7 @@ export function Camera({
         <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between p-4 text-sm text-white">
           <span>{film.title}</span>
           <span>
-            {left} / {film.shot_limit}
+            {unlimited ? "Unlimited" : `${left} / ${film.shot_limit}`}
           </span>
         </div>
         <button

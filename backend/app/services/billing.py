@@ -16,6 +16,7 @@ from app.core.logging import get_logger
 from app.db.models import Film, Payment
 from app.services.catalog import (
     KEEP_FOREVER,
+    UNLIMITED_SHOTS,
     Addon,
     Tier,
     addon_by_id,
@@ -61,6 +62,8 @@ def quote_tier(film: Film, tier: Tier) -> int:
 def quote_addon(film: Film, addon: Addon) -> int:
     if addon.id == KEEP_FOREVER.id and film.keep_forever:
         raise AlreadyPurchased("this film already keeps photos forever")
+    if addon.id == UNLIMITED_SHOTS.id and film.unlimited_shots:
+        raise AlreadyPurchased("this film already has unlimited shots")
     return addon.amount_cents
 
 
@@ -164,6 +167,9 @@ def _grant(film: Film, payment: Payment) -> None:
         return
     if prefix == "addon" and item_id == KEEP_FOREVER.id:
         film.keep_forever = True
+        return
+    if prefix == "addon" and item_id == UNLIMITED_SHOTS.id:
+        film.unlimited_shots = True
         return
     raise BillingError(f"unknown purchase {payment.kind}")
 

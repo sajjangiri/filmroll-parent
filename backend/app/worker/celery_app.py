@@ -35,6 +35,9 @@ celery_app.conf.update(
         "app.worker.tasks.purge_film_objects": {"queue": "fast"},
         "app.worker.tasks.build_recap_video": {"queue": "media"},
         "app.worker.tasks.build_export_archive": {"queue": "media"},
+        "app.worker.tasks.send_host_login": {"queue": "fast"},
+        "app.worker.tasks.notify_developed_films": {"queue": "fast"},
+        "app.worker.tasks.notify_retention_films": {"queue": "fast"},
     },
     task_annotations={
         "app.worker.tasks.build_export_archive": {
@@ -50,6 +53,14 @@ celery_app.conf.update(
         "sweep-abandoned-reservations": {
             "task": "app.worker.tasks.sweep_abandoned_reservations",
             "schedule": 300.0,
+        },
+        "notify-developed-films": {
+            "task": "app.worker.tasks.notify_developed_films",
+            "schedule": 300.0,
+        },
+        "notify-retention-films": {
+            "task": "app.worker.tasks.notify_retention_films",
+            "schedule": 3600.0,
         },
     },
 )

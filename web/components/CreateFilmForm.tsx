@@ -10,6 +10,7 @@ export function CreateFilmForm() {
   const [hoursOpen, setHoursOpen] = useState(24);
   const [revealHours, setRevealHours] = useState(24);
   const [shotLimit, setShotLimit] = useState(8);
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -29,6 +30,7 @@ export function CreateFilmForm() {
         reveal_at: new Date(now + revealHours * 3_600_000).toISOString(),
         shot_limit: shotLimit,
         guest_cap: 5,
+        ...(email.trim() ? { host_email: email.trim() } : {}),
       });
 
       // The only copy of this token. Losing it means losing host control, which
@@ -87,6 +89,16 @@ export function CreateFilmForm() {
           />
         </label>
       </div>
+      <label className="flex flex-col gap-2">
+        <span className="text-sm text-zinc-400">Your email (optional)</span>
+        <input
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="so you can recover this film"
+          className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-500"
+        />
+      </label>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <button
         type="submit"
@@ -97,7 +109,8 @@ export function CreateFilmForm() {
       </button>
       <p className="text-xs text-zinc-500">
         Five guests are free. Add a larger room from the host page — billed on
-        the web, not through the App Store.
+        the web, not through the App Store. An email is how you get the host
+        tools back if this browser is cleared.
       </p>
     </form>
   );

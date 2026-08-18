@@ -43,8 +43,9 @@ TIERS: tuple[Tier, ...] = (
 )
 
 KEEP_FOREVER = Addon("keep_forever", 3_900, "Keep photos forever")
+UNLIMITED_SHOTS = Addon("unlimited_shots", 1_900, "Unlimited shots per guest")
 
-ADDONS: tuple[Addon, ...] = (KEEP_FOREVER,)
+ADDONS: tuple[Addon, ...] = (KEEP_FOREVER, UNLIMITED_SHOTS)
 
 
 class CatalogError(Exception):

@@ -95,7 +95,8 @@ export function GuestApp({ code }: { code: string }) {
         <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Filmroll</p>
         <h1 className="font-serif text-3xl text-white">{film.title}</h1>
         <p className="text-sm text-zinc-400">
-          {film.guest_count}/{film.guest_cap} guests · {film.shot_limit} shots each
+          {film.guest_count}/{film.guest_cap} guests ·{" "}
+          {film.unlimited_shots ? "unlimited shots" : `${film.shot_limit} shots each`}
         </p>
         <InstallHint />
       </header>

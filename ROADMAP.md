@@ -62,7 +62,7 @@ Goal: nothing is lost, nothing leaks, reveal is actually enforced.
       double-tap or a retry never burns two shots
 - [x] Derivatives worker: display WebP thumbnail, EXIF stripped, untouched original
 - [x] Self-hosted QR generation (drop the third-party endpoint)
-- [ ] Host session: magic link email or Sign in with Apple, replacing `localStorage`
+- [x] Host session: magic link email, replacing `localStorage` as the only copy
 - [x] Rate limiting + upload size/type validation + EXIF strip on public derivatives
 - [x] Structured logging: join funnel, upload success rate, queue depth
 
@@ -107,7 +107,8 @@ background; that is a platform limit, not a missing retry.
 - [x] Extend film time, raise guest cap, adjust shot limit mid-event
 - [x] Reveal scheduling + "develop now"
 - [x] Guest can delete their own photo
-- [ ] Reveal notification (email/push) the morning after
+- [x] Reveal notification (email) the morning after
+- [ ] Reveal push / ephemeral clip notification
 
 **Done when:** a host can kill a bad photo in one tap before 150 phones see it.
 Met: the host inbox shows photos *before* reveal, with signed URLs that the
@@ -121,12 +122,13 @@ Charge for **capacity and artifacts**, never per shutter press.
 
 - [x] Stripe Checkout on web for guest-cap tiers (free 5 → paid ladder)
 - [x] Entitlement model: cap enforced server-side, upgrade mid-event
-- [ ] Add-ons: unlimited shots, video pack
+- [x] Add-ons: unlimited shots
+- [ ] Video pack add-on
 - [x] Keep-forever add-on (12 months included otherwise; ZIP always free)
 - [ ] Receipts, refunds, VAT/tax handling
 - [x] Storage policy that is honest: 12 months included, then paid keep-forever;
       host ZIP export always free
-- [ ] Month-11 retention email
+- [x] Month-11 retention email
 
 **Why web-first billing:** Stripe on the web keeps ~97% of the price. Apple IAP takes
 15–30%. Selling the event on web and treating the app as the camera is the single

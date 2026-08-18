@@ -22,6 +22,9 @@ Role = Literal["guest", "host"]
 # Long enough to outlive a wedding and the reveal that follows it.
 GUEST_TOKEN_TTL = timedelta(days=30)
 HOST_TOKEN_TTL = timedelta(days=365)
+# Short on purpose. The long-lived host token is issued only after this is
+# exchanged, so a forwarded inbox does not grant a year of access by itself.
+MAGIC_TOKEN_TTL = timedelta(minutes=30)
 
 
 class TokenError(Exception):
@@ -43,6 +46,33 @@ def issue_guest_token(film_id: uuid.UUID, guest_id: uuid.UUID) -> str:
 
 def issue_host_token(film_id: uuid.UUID) -> str:
     return _encode({"role": "host", "film_id": str(film_id), "sub": str(film_id)}, HOST_TOKEN_TTL)
+
+
+def issue_magic_token(film_id: uuid.UUID, email: str) -> str:
+    return _encode(
+        {
+            "role": "magic",
+            "purpose": "host_login",
+            "film_id": str(film_id),
+            "email": email,
+            "sub": str(film_id),
+        },
+        MAGIC_TOKEN_TTL,
+    )
+
+
+def parse_magic(token: str) -> tuple[uuid.UUID, str]:
+    claims = decode(token)
+    if claims.get("role") != "magic" or claims.get("purpose") != "host_login":
+        raise TokenError("not a magic link")
+    try:
+        film_id = uuid.UUID(str(claims["film_id"]))
+        email = str(claims["email"]).strip().lower()
+    except (KeyError, ValueError) as exc:
+        raise TokenError("malformed claims") from exc
+    if not email:
+        raise TokenError("malformed claims")
+    return film_id, email
 
 
 def decode(token: str) -> dict[str, object]:

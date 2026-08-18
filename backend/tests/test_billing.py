@@ -33,6 +33,7 @@ async def test_catalog_is_public(client: AsyncClient) -> None:
     assert body["tiers"][0]["amount_cents"] == 0
     assert any(tier["id"] == "g50" and tier["guest_cap"] == 50 for tier in body["tiers"])
     assert any(addon["id"] == "keep_forever" for addon in body["addons"])
+    assert any(addon["id"] == "unlimited_shots" for addon in body["addons"])
 
 
 async def test_create_clamps_to_the_free_guest_cap(client: AsyncClient, future: datetime) -> None:

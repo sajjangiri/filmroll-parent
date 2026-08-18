@@ -78,9 +78,17 @@ class Film(Base):
     keep_forever: Mapped[bool] = mapped_column(
         Boolean, default=False, server_default=text("false")
     )
+    unlimited_shots: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=text("false")
+    )
     # Inclusive storage window. The ZIP export stays free after this date; the
     # gallery and originals do not. keep_forever wins over the date.
     storage_until: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    # Recovery and notifications. Never returned on the public film payload.
+    host_email: Mapped[str | None] = mapped_column(String(254))
+    reveal_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retention_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

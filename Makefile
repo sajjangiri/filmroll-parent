@@ -15,6 +15,7 @@ up: .env ## Start the whole stack and wait for health
 	@echo
 	@echo "api      http://localhost:8000/docs"
 	@echo "minio    http://localhost:9001  (filmroll / filmroll-dev-secret)"
+	@echo "mailpit  http://localhost:8025"
 
 .PHONY: down
 down: ## Stop the stack, keep volumes

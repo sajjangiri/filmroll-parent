@@ -14,6 +14,7 @@ import type {
   FilmCreated,
   FilmPublic,
   GalleryResponse,
+  HostAccount,
   JoinResponse,
   ReserveResponse,
   ReviewResponse,
@@ -99,6 +100,7 @@ export function createFilm(input: {
   reveal_at: string;
   shot_limit: number;
   guest_cap: number;
+  host_email?: string;
 }): Promise<FilmCreated> {
   return request<FilmCreated>("/v1/films", {
     method: "POST",
@@ -162,6 +164,7 @@ export function updateFilm(
     reveal_at?: string;
     shot_limit?: number;
     guest_cap?: number;
+    host_email?: string;
   },
 ): Promise<FilmPublic> {
   return request<FilmPublic>(`/v1/films/${code}`, {
@@ -199,6 +202,24 @@ export function startCheckout(
     method: "POST",
     token: hostToken,
     body: JSON.stringify(body),
+  });
+}
+
+export function getHostAccount(code: string, hostToken: string): Promise<HostAccount> {
+  return request<HostAccount>(`/v1/films/${code}/host/account`, { token: hostToken });
+}
+
+export function recoverHost(code: string, email: string): Promise<void> {
+  return request<void>(`/v1/films/${code}/host/recover`, {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function consumeMagicSession(code: string, magicToken: string): Promise<FilmCreated> {
+  return request<FilmCreated>(`/v1/films/${code}/host/session`, {
+    method: "POST",
+    body: JSON.stringify({ magic_token: magicToken }),
   });
 }
 

@@ -18,6 +18,7 @@ from app.core.config import get_settings
 from app.db.models import Film, Guest, Shot, ShotState
 from app.services import storage
 from app.services.catalog import FREE_GUEST_CAP, STORAGE_INCLUDED_DAYS
+from app.services.notify import normalize_email
 
 # Ambiguous glyphs removed: no O/0, no I/1, so a code read off a table card or
 # an OCR'd QR fallback cannot be mistyped.
@@ -78,6 +79,10 @@ class ShotNotOwned(FilmError):
 
 
 class CapAboveEntitlement(FilmError):
+    pass
+
+
+class InvalidEmail(FilmError):
     pass
 
 
@@ -146,6 +151,7 @@ async def create_film(
     reveal_at: datetime,
     shot_limit: int,
     guest_cap: int,
+    host_email: str | None = None,
 ) -> Film:
     # Codes are short enough that collisions are possible; retry rather than
     # surfacing a unique-violation to the host.
@@ -168,7 +174,9 @@ async def create_film(
         guest_cap=min(guest_cap, entitled),
         entitled_guest_cap=entitled,
         keep_forever=False,
+        unlimited_shots=False,
         storage_until=datetime.now(UTC) + timedelta(days=STORAGE_INCLUDED_DAYS),
+        host_email=_optional_email(host_email),
     )
     session.add(film)
     await session.flush()
@@ -201,6 +209,8 @@ _RESERVE_SQL = text(
     INSERT INTO shots (id, film_id, guest_id, state, storage_key, content_type, reserved_at)
     SELECT :shot_id, :film_id, :guest_id, 'reserved', :storage_key, :content_type, now()
     WHERE (
+        SELECT unlimited_shots FROM films WHERE id = :film_id
+    ) OR (
         SELECT count(*) FROM shots
         WHERE guest_id = :guest_id AND state <> 'expired'
     ) < (SELECT shot_limit FROM films WHERE id = :film_id)
@@ -367,6 +377,7 @@ async def update_film(
     reveal_at: datetime | None = None,
     shot_limit: int | None = None,
     guest_cap: int | None = None,
+    host_email: str | None = None,
 ) -> Film:
     if guest_cap is not None:
         current = await guest_count(session, film.id)
@@ -395,6 +406,8 @@ async def update_film(
         film.closes_at = closes_at
     if reveal_at is not None:
         film.reveal_at = reveal_at
+    if host_email is not None:
+        film.host_email = _optional_email(host_email) if host_email else None
 
     await session.flush()
     await session.refresh(film)
@@ -441,12 +454,23 @@ async def review_shots(session: AsyncSession, film_id: uuid.UUID) -> list[Shot]:
 
 
 async def shots_remaining(session: AsyncSession, *, film: Film, guest_id: uuid.UUID) -> int:
+    if film.unlimited_shots:
+        return 10_000
     used = await session.scalar(
         select(func.count())
         .select_from(Shot)
         .where(Shot.guest_id == guest_id, Shot.state != ShotState.EXPIRED)
     )
     return max(film.shot_limit - (used or 0), 0)
+
+
+def _optional_email(raw: str | None) -> str | None:
+    if raw is None or not raw.strip():
+        return None
+    try:
+        return normalize_email(raw)
+    except ValueError as exc:
+        raise InvalidEmail(str(exc)) from exc
 
 
 async def guest_count(session: AsyncSession, film_id: uuid.UUID) -> int:

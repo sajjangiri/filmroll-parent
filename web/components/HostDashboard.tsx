@@ -5,13 +5,17 @@ import {
   API_URL,
   ApiError,
   cardsPdfUrl,
+  consumeMagicSession,
   getCatalog,
   getExport,
   getFilm,
+  getHostAccount,
   getReview,
   hideShot,
   loadHostToken,
+  recoverHost,
   revealFilm,
+  saveHostToken,
   startCheckout,
   startExport,
   unhideShot,
@@ -55,6 +59,10 @@ export function HostDashboard({ code }: { code: string }) {
   const [hasHostKey, setHasHostKey] = useState(false);
   const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
   const [checkingOut, setCheckingOut] = useState<string | null>(null);
+  const [hostEmail, setHostEmail] = useState("");
+  const [recoverEmail, setRecoverEmail] = useState("");
+  const [recoverBusy, setRecoverBusy] = useState(false);
+  const [recoverSent, setRecoverSent] = useState(false);
 
   const origin = useSyncExternalStore(neverChanges, readOrigin, originOnServer);
   const joinUrl = film?.join_url || (origin ? `${origin}/f/${code}` : "");
@@ -78,6 +86,8 @@ export function HostDashboard({ code }: { code: string }) {
       setPhotos(review.photos);
       const exp = await getExport(code, token);
       setExportState(exp);
+      const account = await getHostAccount(code, token);
+      setHostEmail(account.email ?? "");
     } catch (err) {
       if (err instanceof ApiError && err.status === 403) {
         setError("This device does not have the host key for this film.");
@@ -97,16 +107,37 @@ export function HostDashboard({ code }: { code: string }) {
         // Catalog is public; a failure here should not block host tools.
       });
     }, 0);
+    const magicLoad = window.setTimeout(() => {
+      const magic = new URLSearchParams(window.location.search).get("magic");
+      if (!magic) return;
+      void consumeMagicSession(code, magic)
+        .then((created) => {
+          saveHostToken(code, created.host_token);
+          window.history.replaceState({}, "", window.location.pathname);
+          setHasHostKey(true);
+          void refresh();
+        })
+        .catch(() => {
+          setError("That recovery link is invalid or expired.");
+        });
+    }, 0);
     const params = new URLSearchParams(window.location.search);
     if (params.get("checkout")) {
-      window.history.replaceState({}, "", window.location.pathname);
+      params.delete("checkout");
+      const qs = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        qs ? `${window.location.pathname}?${qs}` : window.location.pathname,
+      );
     }
     return () => {
       window.clearInterval(id);
       window.clearTimeout(first);
       window.clearTimeout(catalogLoad);
+      window.clearTimeout(magicLoad);
     };
-  }, [refresh]);
+  }, [refresh, code]);
 
   async function reveal() {
     const token = loadHostToken(code);
@@ -209,6 +240,31 @@ export function HostDashboard({ code }: { code: string }) {
     }
   }
 
+  async function saveEmail() {
+    const token = loadHostToken(code);
+    if (!token) return;
+    try {
+      await updateFilm(code, token, { host_email: hostEmail.trim() });
+      setError("");
+    } catch {
+      setError("Could not save that email.");
+    }
+  }
+
+  async function sendRecovery() {
+    if (!recoverEmail.trim()) return;
+    setRecoverBusy(true);
+    setError("");
+    try {
+      await recoverHost(code, recoverEmail.trim());
+      setRecoverSent(true);
+    } catch {
+      setError("Could not send a recovery email.");
+    } finally {
+      setRecoverBusy(false);
+    }
+  }
+
   async function copy() {
     if (!joinUrl) return;
     await navigator.clipboard.writeText(joinUrl);
@@ -229,7 +285,7 @@ export function HostDashboard({ code }: { code: string }) {
         <h1 className="font-serif text-4xl text-white">{film.title}</h1>
         <p className="text-sm text-zinc-400">
           {film.guest_count}/{film.guest_cap} guests · {film.shot_count} shots ·{" "}
-          {film.shot_limit} per camera
+          {film.unlimited_shots ? "unlimited shots" : `${film.shot_limit} per camera`}
           {hiddenCount ? ` · ${hiddenCount} hidden` : ""}
           {film.keep_forever ? " · kept forever" : ""}
         </p>
@@ -371,8 +427,14 @@ export function HostDashboard({ code }: { code: string }) {
                     );
                   })}
               </div>
-              {!film.keep_forever
-                ? catalog.addons.map((addon) => (
+              {!film.keep_forever || !film.unlimited_shots
+                ? catalog.addons
+                    .filter((addon) => {
+                      if (addon.id === "keep_forever") return !film.keep_forever;
+                      if (addon.id === "unlimited_shots") return !film.unlimited_shots;
+                      return true;
+                    })
+                    .map((addon) => (
                     <button
                       key={addon.id}
                       type="button"
@@ -388,12 +450,57 @@ export function HostDashboard({ code }: { code: string }) {
                 : null}
             </div>
           ) : null}
+          <div className="flex flex-col gap-2 pt-2">
+            <p className="text-sm text-zinc-400">
+              Recovery email. If this phone is lost, we send a host link here.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <input
+                type="email"
+                value={hostEmail}
+                onChange={(e) => setHostEmail(e.target.value)}
+                placeholder="you@example.com"
+                className="min-w-48 flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => void saveEmail()}
+                className="rounded-full border border-zinc-600 px-4 py-2 text-sm"
+              >
+                Save email
+              </button>
+            </div>
+          </div>
         </section>
       ) : (
-        <p className="text-sm text-zinc-500">
-          Moderation and export need the host key from the device that created
-          this film.
-        </p>
+        <section className="flex flex-col gap-3 rounded-2xl border border-zinc-800 p-4">
+          <p className="text-sm text-zinc-500">
+            Moderation and export need the host key from the device that created
+            this film. If you saved an email, we can send a new link.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <input
+              type="email"
+              value={recoverEmail}
+              onChange={(e) => setRecoverEmail(e.target.value)}
+              placeholder="Host email"
+              className="min-w-48 flex-1 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => void sendRecovery()}
+              disabled={recoverBusy}
+              className="rounded-full border border-zinc-600 px-4 py-2 text-sm disabled:opacity-40"
+            >
+              {recoverBusy ? "Sending…" : "Email me a host link"}
+            </button>
+          </div>
+          {recoverSent ? (
+            <p className="text-sm text-zinc-400">
+              If that email is on this film, a link is on its way.
+            </p>
+          ) : null}
+        </section>
       )}
 
       {hasHostKey ? (

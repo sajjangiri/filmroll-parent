@@ -67,6 +67,17 @@ class Settings(BaseSettings):
     stripe_automatic_tax: bool = False
     billing_fake: bool = True
 
+    # Local default is Mailpit on the compose network. Empty host means the
+    # mailer records messages in-process (tests) instead of opening a socket.
+    smtp_host: str = ""
+    smtp_port: int = 1025
+    smtp_user: str = ""
+    smtp_password: str = ""
+    smtp_from: str = "Filmroll <noreply@localhost>"
+    smtp_starttls: bool = False
+
+    rate_limit_recover_per_hour: int = 8
+
     @property
     def use_fake_billing(self) -> bool:
         if self.is_production:

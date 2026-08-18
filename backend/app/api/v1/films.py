@@ -19,8 +19,11 @@ from app.schemas import (
     FilmUpdate,
     GalleryPhoto,
     GalleryResponse,
+    HostAccount,
     JoinRequest,
     JoinResponse,
+    MagicSessionRequest,
+    RecoverRequest,
     ReserveRequest,
     ReserveResponse,
     ReviewPhoto,
@@ -30,6 +33,7 @@ from app.services import (
     billing,
     catalog,
     exports,
+    notify,
     printcards,
     qrcodes,
     ratelimit,
@@ -72,6 +76,7 @@ async def _to_public(
         guest_cap=film.guest_cap,
         entitled_guest_cap=film.entitled_guest_cap,
         keep_forever=film.keep_forever,
+        unlimited_shots=film.unlimited_shots,
         storage_until=film.storage_until,
         guest_count=await films_service.guest_count(session, film.id),
         shot_count=len(await films_service.visible_shots(session, film.id)),
@@ -81,19 +86,25 @@ async def _to_public(
 
 @router.post("", response_model=FilmCreated, status_code=status.HTTP_201_CREATED)
 async def create_film(payload: FilmCreate, session: DbSession) -> FilmCreated:
-    film = await films_service.create_film(
-        session,
-        title=payload.title,
-        event_type=payload.event_type,
-        closes_at=payload.closes_at,
-        reveal_at=payload.reveal_at,
-        shot_limit=payload.shot_limit,
-        guest_cap=payload.guest_cap,
-    )
+    try:
+        film = await films_service.create_film(
+            session,
+            title=payload.title,
+            event_type=payload.event_type,
+            closes_at=payload.closes_at,
+            reveal_at=payload.reveal_at,
+            shot_limit=payload.shot_limit,
+            guest_cap=payload.guest_cap,
+            host_email=payload.host_email,
+        )
+    except films_service.InvalidEmail:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid email") from None
     view = await films_service.load_by_id(session, film.id)
     public = await _to_public(
         session, view.film, is_developed=view.is_developed, is_closed=view.is_closed
     )
+    if film.host_email:
+        notify.send_host_login(film)
     log.info("film.created", film_id=str(film.id), code=film.code)
     return FilmCreated(film=public, host_token=tokens.issue_host_token(film.id))
 
@@ -277,6 +288,7 @@ async def gallery(view: FilmDep, session: DbSession) -> GalleryResponse:
 @router.post("/{code}/reveal", response_model=FilmPublic)
 async def reveal(view: FilmDep, principal: HostPrincipal, session: DbSession) -> FilmPublic:
     await films_service.reveal_now(session, view.film)
+    enqueue_after_commit(session, "app.worker.tasks.notify_developed_films")
     refreshed = await films_service.load_by_id(session, view.film.id)
     return await _to_public(
         session,
@@ -324,6 +336,7 @@ async def update_film(
             reveal_at=payload.reveal_at,
             shot_limit=payload.shot_limit,
             guest_cap=payload.guest_cap,
+            host_email=payload.host_email,
         )
     except films_service.CapBelowHeadcount as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
@@ -331,6 +344,11 @@ async def update_film(
         raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, str(exc)) from None
     except films_service.LimitBelowUse as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    except films_service.InvalidEmail:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "invalid email") from None
+
+    if payload.host_email:
+        notify.send_host_login(view.film)
 
     refreshed = await films_service.load_by_id(session, view.film.id)
     return await _to_public(
@@ -475,3 +493,49 @@ async def checkout(
         fake=fake,
     )
     return CheckoutResponse(url=url, fake=fake, amount_cents=amount)
+
+
+@router.get("/{code}/host/account", response_model=HostAccount)
+async def host_account(view: FilmDep, principal: HostPrincipal) -> HostAccount:
+    return HostAccount(email=view.film.host_email, unlimited_shots=view.film.unlimited_shots)
+
+
+@router.post("/{code}/host/recover", status_code=status.HTTP_204_NO_CONTENT)
+async def recover_host(
+    payload: RecoverRequest, view: FilmDep, request: Request
+) -> None:
+    """Always 204. Whether the email matches is not something a stranger should learn."""
+    settings = get_settings()
+    if not await ratelimit.allow(
+        "recover",
+        f"{view.film.code}:{_client_ip(request)}",
+        limit=settings.rate_limit_recover_per_hour,
+        window_seconds=3600,
+    ):
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many recovery attempts")
+
+    try:
+        email = notify.normalize_email(payload.email)
+    except ValueError:
+        return
+    if view.film.host_email and view.film.host_email == email:
+        notify.send_host_login(view.film)
+
+
+@router.post("/{code}/host/session", response_model=FilmCreated)
+async def consume_magic_link(
+    payload: MagicSessionRequest, view: FilmDep, session: DbSession
+) -> FilmCreated:
+    try:
+        film_id, email = tokens.parse_magic(payload.magic_token)
+    except tokens.TokenError:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or expired link") from None
+    if film_id != view.film.id or not view.film.host_email or view.film.host_email != email:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "invalid or expired link") from None
+    public = await _to_public(
+        session,
+        view.film,
+        is_developed=view.is_developed,
+        is_closed=view.is_closed,
+    )
+    return FilmCreated(film=public, host_token=tokens.issue_host_token(view.film.id))

@@ -18,6 +18,7 @@ export type FilmPublic = {
   guest_cap: number;
   entitled_guest_cap: number;
   keep_forever: boolean;
+  unlimited_shots: boolean;
   storage_until: string;
   guest_count: number;
   shot_count: number;
@@ -112,4 +113,9 @@ export type CheckoutResponse = {
   url: string;
   fake: boolean;
   amount_cents: number;
+};
+
+export type HostAccount = {
+  email: string | null;
+  unlimited_shots: boolean;
 };

@@ -220,3 +220,32 @@ def pending_derivative_ids(limit: int = 100) -> list[str]:
             .limit(limit)
         ).all()
     return [str(row[0]) for row in rows]
+
+
+@celery_app.task(name="app.worker.tasks.send_host_login")
+def send_host_login(film_id: str) -> str:
+    from app.db.models import Film
+    from app.services import notify
+
+    with session_scope() as session:
+        film = session.get(Film, uuid.UUID(film_id))
+        if film is None or not film.host_email:
+            return "missing"
+        notify.send_host_login(film)
+    return "ok"
+
+
+@celery_app.task(name="app.worker.tasks.notify_developed_films")
+def notify_developed_films() -> int:
+    from app.services import notify
+
+    with session_scope() as session:
+        return notify.notify_developed_films(session)
+
+
+@celery_app.task(name="app.worker.tasks.notify_retention_films")
+def notify_retention_films() -> int:
+    from app.services import notify
+
+    with session_scope() as session:
+        return notify.notify_retention_films(session)

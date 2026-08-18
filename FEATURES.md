@@ -73,7 +73,7 @@ Legend:
 | Thumbnail / display derivatives | done | 1 | P0 | api |
 | Bulk ZIP of originals | done | 3 | P1 | web, ios |
 | Guest saves a single photo | todo | 3 | P1 | web, ios |
-| Reveal notification (email / push) | todo | 3 | P1 | web, ios |
+| Reveal notification (email / push) | done | 3 | P1 | web, ios |
 | Ephemeral reveal notification (8h/24h) | todo | 5 | P2 | clip |
 | Live slideshow for a venue screen | todo | 6 | P2 | web |
 | Recap video, 45–90s with music | todo | 6 | P2 | api |
@@ -84,7 +84,7 @@ Legend:
 | Feature | Status | Phase | Pri | Surface |
 |---|---|---|---|---|
 | Host dashboard (guests, shots, health) | done | 0 | P0 | web, ios |
-| Durable host auth (magic link / Apple) | todo | 1 | P0 | web, ios |
+| Durable host auth (magic link / Apple) | done | 1 | P0 | web, ios |
 | **One-tap hide / moderation queue** | done | 3 | P0 | web, ios |
 | Hidden photos never fan out | done | 3 | P0 | api |
 | Co-hosts | todo | 3 | P1 | web, ios |
@@ -104,7 +104,7 @@ Legend:
 | Server-side entitlement enforcement | done | 4 | P0 | api |
 | Upgrade cap mid-event | done | 4 | P1 | web, ios |
 | StoreKit 2 IAP (full app only) | todo | 5 | P1 | ios |
-| Unlimited-shots add-on | todo | 4 | P1 | web, ios |
+| Unlimited-shots add-on | done | 4 | P1 | web, ios |
 | Video pack add-on | todo | 6 | P2 | web, ios |
 | Keep-forever storage after 12 months | done | 4 | P1 | web |
 | Photobook / prints | todo | 6 | P2 | web |

@@ -29,6 +29,7 @@ os.environ["SECRET_KEY"] = "test-secret-key-at-least-32-bytes-long-for-hmac-sha2
 os.environ["MAX_UPLOAD_BYTES"] = "65536"
 os.environ["PUBLIC_WEB_URL"] = "http://localhost:3000"
 os.environ["BILLING_FAKE"] = "true"
+os.environ["SMTP_HOST"] = ""
 
 import uuid  # noqa: E402
 from collections.abc import AsyncIterator  # noqa: E402
@@ -100,6 +101,9 @@ async def _clean_tables() -> AsyncIterator[None]:
         await conn.execute(
             text("TRUNCATE films, guests, shots, payments RESTART IDENTITY CASCADE")
         )
+    from app.services import mail
+
+    mail.outbox.clear()
     yield
 
 
