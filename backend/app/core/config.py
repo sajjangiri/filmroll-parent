@@ -59,6 +59,24 @@ class Settings(BaseSettings):
     rate_limit_join_per_hour: int = 20
     rate_limit_reserve_per_minute: int = 30
 
+    # Billing. The catalog lives in code; these credentials only talk to Stripe.
+    # Local development defaults to fake Checkout so a host can raise a cap
+    # without an API key. Production refuses the fake path even if asked.
+    stripe_secret_key: str = ""
+    stripe_webhook_secret: str = ""
+    stripe_automatic_tax: bool = False
+    billing_fake: bool = True
+
+    @property
+    def use_fake_billing(self) -> bool:
+        if self.is_production:
+            return False
+        return self.billing_fake or not self.stripe_secret_key
+
+    @property
+    def stripe_configured(self) -> bool:
+        return bool(self.stripe_secret_key)
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]

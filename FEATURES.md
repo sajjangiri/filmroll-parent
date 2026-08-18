@@ -99,14 +99,14 @@ Legend:
 
 | Feature | Status | Phase | Pri | Surface |
 |---|---|---|---|---|
-| Free tier (5 guests, full features) | todo | 4 | P0 | api |
-| **Stripe Checkout on web, by guest cap** | todo | 4 | P0 | web |
-| Server-side entitlement enforcement | todo | 4 | P0 | api |
-| Upgrade cap mid-event | todo | 4 | P1 | web, ios |
+| Free tier (5 guests, full features) | done | 4 | P0 | api |
+| **Stripe Checkout on web, by guest cap** | done | 4 | P0 | web |
+| Server-side entitlement enforcement | done | 4 | P0 | api |
+| Upgrade cap mid-event | done | 4 | P1 | web, ios |
 | StoreKit 2 IAP (full app only) | todo | 5 | P1 | ios |
 | Unlimited-shots add-on | todo | 4 | P1 | web, ios |
 | Video pack add-on | todo | 6 | P2 | web, ios |
-| Keep-forever storage after 12 months | todo | 4 | P1 | web |
+| Keep-forever storage after 12 months | done | 4 | P1 | web |
 | Photobook / prints | todo | 6 | P2 | web |
 | Planner / venue license, invoicing | todo | 6 | P2 | web |
 | Brand rights pack + event analytics | todo | 6 | P2 | web |

@@ -24,6 +24,7 @@ dependencies = [
     # servers and scales cleanly for printed table cards.
     "segno>=1.6",
     "fpdf2>=2.8",
+    "stripe>=11.0",
 ]
 
 [dependency-groups]

@@ -99,6 +99,14 @@ def main() -> int:
         print(f"error: could not create film ({status})", file=sys.stderr)
         return 1
     code = created["film"]["code"]
+    host_token = created["host_token"]
+    status, checkout = call(
+        "POST", f"{API}/v1/films/{code}/checkout",
+        body={"tier_id": "g50"}, token=host_token,
+    )
+    if status != 200:
+        print(f"error: could not entitle 50 guests ({status})", file=sys.stderr)
+        return 1
 
     tokens: list[str] = []
     with ThreadPoolExecutor(max_workers=WORKERS) as pool:

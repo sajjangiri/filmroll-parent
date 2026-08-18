@@ -5,21 +5,43 @@ import {
   API_URL,
   ApiError,
   cardsPdfUrl,
+  getCatalog,
   getExport,
   getFilm,
   getReview,
   hideShot,
   loadHostToken,
   revealFilm,
+  startCheckout,
   startExport,
   unhideShot,
   updateFilm,
 } from "@/lib/api";
-import type { ExportResponse, FilmPublic, ReviewPhoto } from "@/lib/types";
+import type { CatalogResponse, ExportResponse, FilmPublic, ReviewPhoto } from "@/lib/types";
 
 const neverChanges = () => () => {};
 const readOrigin = () => window.location.origin;
 const originOnServer = () => "";
+
+function usd(cents: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
+}
+
+function goTo(url: string): void {
+  window.location.assign(url);
+}
+
+function paidForCap(catalog: CatalogResponse, cap: number): number {
+  let paid = 0;
+  for (const tier of catalog.tiers) {
+    if (tier.guest_cap <= cap) paid = tier.amount_cents;
+  }
+  return paid;
+}
 
 export function HostDashboard({ code }: { code: string }) {
   const [film, setFilm] = useState<FilmPublic | null>(null);
@@ -31,6 +53,8 @@ export function HostDashboard({ code }: { code: string }) {
   const [guestCap, setGuestCap] = useState(25);
   const [shotLimit, setShotLimit] = useState(8);
   const [hasHostKey, setHasHostKey] = useState(false);
+  const [catalog, setCatalog] = useState<CatalogResponse | null>(null);
+  const [checkingOut, setCheckingOut] = useState<string | null>(null);
 
   const origin = useSyncExternalStore(neverChanges, readOrigin, originOnServer);
   const joinUrl = film?.join_url || (origin ? `${origin}/f/${code}` : "");
@@ -68,9 +92,19 @@ export function HostDashboard({ code }: { code: string }) {
     const first = window.setTimeout(() => {
       void refresh();
     }, 0);
+    const catalogLoad = window.setTimeout(() => {
+      void getCatalog().then(setCatalog).catch(() => {
+        // Catalog is public; a failure here should not block host tools.
+      });
+    }, 0);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("checkout")) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
     return () => {
       window.clearInterval(id);
       window.clearTimeout(first);
+      window.clearTimeout(catalogLoad);
     };
   }, [refresh]);
 
@@ -126,7 +160,9 @@ export function HostDashboard({ code }: { code: string }) {
       setError(
         err instanceof ApiError && err.status === 409
           ? "That cap is below people who already joined."
-          : "Could not update the film.",
+          : err instanceof ApiError && err.status === 402
+            ? "Pay for a larger room to raise the guest cap."
+            : "Could not update the film.",
       );
     }
   }
@@ -141,7 +177,7 @@ export function HostDashboard({ code }: { code: string }) {
         const next = await getExport(code, token);
         setExportState(next);
         if (next.status === "ready" && next.download_url) {
-          window.location.href = next.download_url;
+          goTo(next.download_url);
           return;
         }
         if (next.status === "failed") {
@@ -151,6 +187,25 @@ export function HostDashboard({ code }: { code: string }) {
       }
     } catch {
       setError("Could not start the download.");
+    }
+  }
+
+  async function pay(body: { tier_id?: string; addon_id?: string }) {
+    const token = loadHostToken(code);
+    if (!token) return;
+    const key = body.tier_id ?? body.addon_id ?? "pay";
+    setCheckingOut(key);
+    setError("");
+    try {
+      const session = await startCheckout(code, token, body);
+      goTo(session.url);
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 409
+          ? "That is already included."
+          : "Could not start checkout.",
+      );
+      setCheckingOut(null);
     }
   }
 
@@ -176,6 +231,7 @@ export function HostDashboard({ code }: { code: string }) {
           {film.guest_count}/{film.guest_cap} guests · {film.shot_count} shots ·{" "}
           {film.shot_limit} per camera
           {hiddenCount ? ` · ${hiddenCount} hidden` : ""}
+          {film.keep_forever ? " · kept forever" : ""}
         </p>
       </header>
 
@@ -255,14 +311,19 @@ export function HostDashboard({ code }: { code: string }) {
 
       {hasHostKey ? (
         <section className="flex flex-col gap-3 rounded-2xl border border-zinc-800 p-4">
-          <p className="text-sm text-zinc-400">Raise capacity mid-event</p>
+          <p className="text-sm text-zinc-400">
+            Room size. Paid for {film.entitled_guest_cap} guests
+            {film.keep_forever
+              ? "; photos stay forever."
+              : `; originals stay until ${new Date(film.storage_until).toLocaleDateString()}. The ZIP is always free.`}
+          </p>
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
               Guest cap
               <input
                 type="number"
                 min={film.guest_count}
-                max={1000}
+                max={film.entitled_guest_cap}
                 value={guestCap}
                 onChange={(e) => setGuestCap(Number(e.target.value))}
                 className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2"
@@ -287,6 +348,46 @@ export function HostDashboard({ code }: { code: string }) {
           >
             Save
           </button>
+          {catalog ? (
+            <div className="flex flex-col gap-2 pt-2">
+              <p className="text-sm text-zinc-400">Need a larger room?</p>
+              <div className="flex flex-wrap gap-2">
+                {catalog.tiers
+                  .filter((tier) => tier.guest_cap > film.entitled_guest_cap)
+                  .map((tier) => {
+                    const charge = tier.amount_cents - paidForCap(catalog, film.entitled_guest_cap);
+                    return (
+                      <button
+                        key={tier.id}
+                        type="button"
+                        disabled={checkingOut !== null}
+                        onClick={() => void pay({ tier_id: tier.id })}
+                        className="rounded-full border border-zinc-600 px-4 py-2 text-sm disabled:opacity-40"
+                      >
+                        {checkingOut === tier.id
+                          ? "Redirecting…"
+                          : `${tier.label} · ${usd(charge)}`}
+                      </button>
+                    );
+                  })}
+              </div>
+              {!film.keep_forever
+                ? catalog.addons.map((addon) => (
+                    <button
+                      key={addon.id}
+                      type="button"
+                      disabled={checkingOut !== null}
+                      onClick={() => void pay({ addon_id: addon.id })}
+                      className="self-start rounded-full px-4 py-2 text-sm text-zinc-400 disabled:opacity-40"
+                    >
+                      {checkingOut === addon.id
+                        ? "Redirecting…"
+                        : `${addon.label} · ${usd(addon.amount_cents)}`}
+                    </button>
+                  ))
+                : null}
+            </div>
+          ) : null}
         </section>
       ) : (
         <p className="text-sm text-zinc-500">

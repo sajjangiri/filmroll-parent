@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import films, health
+from app.api.v1 import billing, films, health
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.db.session import dispose_engine
@@ -43,6 +43,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health.router)
     app.include_router(films.router)
+    app.include_router(billing.router)
 
     return app
 

@@ -16,6 +16,9 @@ export type FilmPublic = {
   is_closed: boolean;
   shot_limit: number;
   guest_cap: number;
+  entitled_guest_cap: number;
+  keep_forever: boolean;
+  storage_until: string;
   guest_count: number;
   shot_count: number;
   join_url: string;
@@ -80,4 +83,33 @@ export type ExportResponse = {
   status: "idle" | "pending" | "ready" | "failed" | string;
   shot_count: number;
   download_url: string | null;
+};
+
+export type BillingTier = {
+  id: string;
+  guest_cap: number;
+  amount_cents: number;
+  currency: string;
+  label: string;
+};
+
+export type BillingAddon = {
+  id: string;
+  amount_cents: number;
+  currency: string;
+  label: string;
+};
+
+export type CatalogResponse = {
+  free_guest_cap: number;
+  storage_days: number;
+  currency: string;
+  tiers: BillingTier[];
+  addons: BillingAddon[];
+};
+
+export type CheckoutResponse = {
+  url: string;
+  fake: boolean;
+  amount_cents: number;
 };

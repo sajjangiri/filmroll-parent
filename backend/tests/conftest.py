@@ -28,6 +28,7 @@ os.environ["SECRET_KEY"] = "test-secret-key-at-least-32-bytes-long-for-hmac-sha2
 # Small enough that the oversized-upload tests do not push 25 MB through MinIO.
 os.environ["MAX_UPLOAD_BYTES"] = "65536"
 os.environ["PUBLIC_WEB_URL"] = "http://localhost:3000"
+os.environ["BILLING_FAKE"] = "true"
 
 import uuid  # noqa: E402
 from collections.abc import AsyncIterator  # noqa: E402
@@ -77,6 +78,10 @@ async def _schema() -> AsyncIterator[None]:
     _ensure_bucket()
     engine = get_engine()
     async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        # Native PG enums survive drop_all; leaving them makes create_all error
+        # with DuplicateObject when the models change.
+        await conn.execute(text("DROP TYPE IF EXISTS shot_state CASCADE"))
         await conn.run_sync(Base.metadata.create_all)
     yield
     await dispose_engine()
@@ -92,7 +97,9 @@ async def _clean_tables() -> AsyncIterator[None]:
     """
     engine = get_engine()
     async with engine.begin() as conn:
-        await conn.execute(text("TRUNCATE films, guests, shots RESTART IDENTITY CASCADE"))
+        await conn.execute(
+            text("TRUNCATE films, guests, shots, payments RESTART IDENTITY CASCADE")
+        )
     yield
 
 
@@ -138,7 +145,20 @@ async def make_film(
     )
     assert response.status_code == 201, response.text
     body = response.json()
-    return body["film"]["code"], body["host_token"]
+    code = body["film"]["code"]
+    host_token = body["host_token"]
+    # Create always lands on the free entitlement. Tests that need a bigger
+    # room pay for it through the same Checkout path a host uses.
+    if guest_cap > body["film"]["guest_cap"]:
+        from app.services.catalog import tier_covering
+
+        paid = await client.post(
+            f"/v1/films/{code}/checkout",
+            json={"tier_id": tier_covering(guest_cap).id},
+            headers=auth(host_token),
+        )
+        assert paid.status_code == 200, paid.text
+    return code, host_token
 
 
 async def join(client: AsyncClient, code: str, name: str = "Guest") -> str:

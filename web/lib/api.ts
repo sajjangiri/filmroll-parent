@@ -7,6 +7,8 @@
  */
 
 import type {
+  CatalogResponse,
+  CheckoutResponse,
   CommitResponse,
   ExportResponse,
   FilmCreated,
@@ -182,6 +184,22 @@ export function getExport(code: string, hostToken: string): Promise<ExportRespon
 
 export function cardsPdfUrl(code: string): string {
   return `${API_URL}/v1/films/${code}/cards.pdf`;
+}
+
+export function getCatalog(): Promise<CatalogResponse> {
+  return request<CatalogResponse>("/v1/billing/catalog");
+}
+
+export function startCheckout(
+  code: string,
+  hostToken: string,
+  body: { tier_id?: string; addon_id?: string },
+): Promise<CheckoutResponse> {
+  return request<CheckoutResponse>(`/v1/films/${code}/checkout`, {
+    method: "POST",
+    token: hostToken,
+    body: JSON.stringify(body),
+  });
 }
 
 // --------------------------------------------------------------- capture flow

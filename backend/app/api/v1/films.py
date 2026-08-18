@@ -9,6 +9,8 @@ from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.models import Film
 from app.schemas import (
+    CheckoutRequest,
+    CheckoutResponse,
     CommitResponse,
     ExportResponse,
     FilmCreate,
@@ -24,7 +26,17 @@ from app.schemas import (
     ReviewPhoto,
     ReviewResponse,
 )
-from app.services import exports, printcards, qrcodes, ratelimit, storage, tokens
+from app.services import (
+    billing,
+    catalog,
+    exports,
+    printcards,
+    qrcodes,
+    ratelimit,
+    storage,
+    stripe_billing,
+    tokens,
+)
 from app.services import films as films_service
 from app.services.dispatch import enqueue_after_commit
 
@@ -58,6 +70,9 @@ async def _to_public(
         is_closed=is_closed,
         shot_limit=film.shot_limit,
         guest_cap=film.guest_cap,
+        entitled_guest_cap=film.entitled_guest_cap,
+        keep_forever=film.keep_forever,
+        storage_until=film.storage_until,
         guest_count=await films_service.guest_count(session, film.id),
         shot_count=len(await films_service.visible_shots(session, film.id)),
         join_url=qrcodes.join_url(film.code),
@@ -312,6 +327,8 @@ async def update_film(
         )
     except films_service.CapBelowHeadcount as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    except films_service.CapAboveEntitlement as exc:
+        raise HTTPException(status.HTTP_402_PAYMENT_REQUIRED, str(exc)) from None
     except films_service.LimitBelowUse as exc:
         raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
 
@@ -387,3 +404,74 @@ async def get_export(view: FilmDep, principal: HostPrincipal, session: DbSession
         else:
             state = "idle"
     return ExportResponse(status=state, shot_count=len(shots), download_url=url)
+
+
+@router.post("/{code}/checkout", response_model=CheckoutResponse)
+async def checkout(
+    payload: CheckoutRequest,
+    view: FilmDep,
+    principal: HostPrincipal,
+    session: DbSession,
+) -> CheckoutResponse:
+    """Start Stripe Checkout (or the local fake) for a higher guest cap or add-on.
+
+    The entitlement is granted only after payment: fake Checkout applies it
+    immediately so local development has no Stripe dependency; production waits
+    for the signed webhook.
+    """
+    try:
+        tier, addon = billing.resolve_item(payload.tier_id, payload.addon_id)
+    except catalog.UnknownTier:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown tier") from None
+    except catalog.UnknownAddon:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "unknown add-on") from None
+    except billing.BillingError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, str(exc)) from None
+
+    try:
+        if tier is not None:
+            amount = billing.quote_tier(view.film, tier)
+        else:
+            assert addon is not None
+            amount = billing.quote_addon(view.film, addon)
+    except (billing.AlreadyEntitled, billing.AlreadyPurchased) as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+
+    kind = billing.kind_for(tier=tier, addon=addon)
+    description = stripe_billing.describe_purchase(tier=tier, addon=addon)
+    try:
+        session_id, url, fake = stripe_billing.create_checkout_session(
+            film=view.film,
+            kind=kind,
+            amount_cents=amount,
+            description=description,
+            guest_cap=tier.guest_cap if tier else None,
+            addon_id=addon.id if addon else None,
+        )
+    except billing.CheckoutNotConfigured:
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "billing is not configured"
+        ) from None
+    except stripe_billing.StripeError as exc:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, str(exc)) from None
+
+    await billing.open_payment(
+        session,
+        film=view.film,
+        provider_session_id=session_id,
+        kind=kind,
+        guest_cap=tier.guest_cap if tier else None,
+        amount_cents=amount,
+        currency=catalog.CURRENCY,
+    )
+    if fake:
+        await billing.fulfill_session(session, provider_session_id=session_id)
+
+    log.info(
+        "billing.checkout",
+        film_id=str(view.film.id),
+        kind=kind,
+        amount_cents=amount,
+        fake=fake,
+    )
+    return CheckoutResponse(url=url, fake=fake, amount_cents=amount)

@@ -97,7 +97,7 @@ background; that is a platform limit, not a missing retry.
 
 ---
 
-## Phase 3 — Host tools `IN PROGRESS`
+## Phase 3 — Host tools `DONE`
 
 - [x] Host dashboard: live guest count, shot count, upload health
 - [x] **Moderation**: one-tap hide (and unhide), hidden photos never fan out
@@ -115,21 +115,25 @@ public gallery will not mint.
 
 ---
 
-## Phase 4 — Money `P1`
+## Phase 4 — Money `IN PROGRESS`
 
 Charge for **capacity and artifacts**, never per shutter press.
 
-- [ ] Stripe Checkout on web for guest-cap tiers (free 5 → paid ladder)
-- [ ] Entitlement model: cap enforced server-side, upgrade mid-event
-- [ ] Add-ons: unlimited shots, video pack, keep-forever storage
+- [x] Stripe Checkout on web for guest-cap tiers (free 5 → paid ladder)
+- [x] Entitlement model: cap enforced server-side, upgrade mid-event
+- [ ] Add-ons: unlimited shots, video pack
+- [x] Keep-forever add-on (12 months included otherwise; ZIP always free)
 - [ ] Receipts, refunds, VAT/tax handling
-- [ ] Storage policy that is honest: 12 months included, then paid keep-forever;
+- [x] Storage policy that is honest: 12 months included, then paid keep-forever;
       host ZIP export always free
 - [ ] Month-11 retention email
 
 **Why web-first billing:** Stripe on the web keeps ~97% of the price. Apple IAP takes
 15–30%. Selling the event on web and treating the app as the camera is the single
 biggest margin decision in the product.
+
+Local Checkout is fake until `STRIPE_SECRET_KEY` is set: the host still picks a
+tier, the cap still rises, and no money moves. Production ignores the fake flag.
 
 ---
 

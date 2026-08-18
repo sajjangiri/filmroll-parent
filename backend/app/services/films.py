@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import secrets
 import uuid
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 from app.core.config import get_settings
 from app.db.models import Film, Guest, Shot, ShotState
 from app.services import storage
+from app.services.catalog import FREE_GUEST_CAP, STORAGE_INCLUDED_DAYS
 
 # Ambiguous glyphs removed: no O/0, no I/1, so a code read off a table card or
 # an OCR'd QR fallback cannot be mistyped.
@@ -73,6 +74,10 @@ class LimitBelowUse(FilmError):
 
 
 class ShotNotOwned(FilmError):
+    pass
+
+
+class CapAboveEntitlement(FilmError):
     pass
 
 
@@ -152,6 +157,7 @@ async def create_film(
     else:  # pragma: no cover - astronomically unlikely
         raise FilmError("could not allocate a unique film code")
 
+    entitled = FREE_GUEST_CAP
     film = Film(
         code=code,
         title=title,
@@ -159,7 +165,10 @@ async def create_film(
         closes_at=closes_at,
         reveal_at=reveal_at,
         shot_limit=shot_limit,
-        guest_cap=guest_cap,
+        guest_cap=min(guest_cap, entitled),
+        entitled_guest_cap=entitled,
+        keep_forever=False,
+        storage_until=datetime.now(UTC) + timedelta(days=STORAGE_INCLUDED_DAYS),
     )
     session.add(film)
     await session.flush()
@@ -363,6 +372,10 @@ async def update_film(
         current = await guest_count(session, film.id)
         if guest_cap < current:
             raise CapBelowHeadcount(f"{guest_cap} is below {current} guests")
+        if guest_cap > film.entitled_guest_cap:
+            raise CapAboveEntitlement(
+                f"entitled to {film.entitled_guest_cap} guests; pay to raise the cap"
+            )
         film.guest_cap = guest_cap
 
     if shot_limit is not None:

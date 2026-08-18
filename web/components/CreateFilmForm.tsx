@@ -10,7 +10,6 @@ export function CreateFilmForm() {
   const [hoursOpen, setHoursOpen] = useState(24);
   const [revealHours, setRevealHours] = useState(24);
   const [shotLimit, setShotLimit] = useState(8);
-  const [guestCap, setGuestCap] = useState(5);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -29,7 +28,7 @@ export function CreateFilmForm() {
         closes_at: new Date(now + hoursOpen * 3_600_000).toISOString(),
         reveal_at: new Date(now + revealHours * 3_600_000).toISOString(),
         shot_limit: shotLimit,
-        guest_cap: guestCap,
+        guest_cap: 5,
       });
 
       // The only copy of this token. Losing it means losing host control, which
@@ -87,17 +86,6 @@ export function CreateFilmForm() {
             className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-500"
           />
         </label>
-        <label className="flex flex-col gap-2">
-          <span className="text-sm text-zinc-400">Guest cap</span>
-          <input
-            type="number"
-            min={1}
-            max={200}
-            value={guestCap}
-            onChange={(e) => setGuestCap(Number(e.target.value))}
-            className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-500"
-          />
-        </label>
       </div>
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
       <button
@@ -108,7 +96,8 @@ export function CreateFilmForm() {
         {busy ? "Creating…" : "Create your film"}
       </button>
       <p className="text-xs text-zinc-500">
-        Free while we clone the Once loop. Guest cap is not billed yet.
+        Five guests are free. Add a larger room from the host page — billed on
+        the web, not through the App Store.
       </p>
     </form>
   );

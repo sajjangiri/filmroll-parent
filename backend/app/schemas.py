@@ -12,7 +12,9 @@ class FilmCreate(BaseModel):
     closes_at: datetime
     reveal_at: datetime
     shot_limit: int = Field(default=24, ge=1, le=500)
-    guest_cap: int = Field(default=25, ge=1, le=1000)
+    # Requests above the free cap are accepted and then clamped. The host
+    # raises the real cap through Checkout, not through this field.
+    guest_cap: int = Field(default=5, ge=1, le=1000)
 
     @field_validator("reveal_at")
     @classmethod
@@ -39,6 +41,9 @@ class FilmPublic(BaseModel):
     is_closed: bool
     shot_limit: int
     guest_cap: int
+    entitled_guest_cap: int
+    keep_forever: bool
+    storage_until: datetime
     guest_count: int
     shot_count: int
     # Built server-side so the QR code, the host screen and a printed card all
@@ -129,3 +134,37 @@ class ExportResponse(BaseModel):
     status: str
     shot_count: int = 0
     download_url: str | None = None
+
+
+class BillingTier(BaseModel):
+    id: str
+    guest_cap: int
+    amount_cents: int
+    currency: str
+    label: str
+
+
+class BillingAddon(BaseModel):
+    id: str
+    amount_cents: int
+    currency: str
+    label: str
+
+
+class CatalogResponse(BaseModel):
+    free_guest_cap: int
+    storage_days: int
+    currency: str
+    tiers: list[BillingTier]
+    addons: list[BillingAddon]
+
+
+class CheckoutRequest(BaseModel):
+    tier_id: str | None = None
+    addon_id: str | None = None
+
+
+class CheckoutResponse(BaseModel):
+    url: str
+    fake: bool = False
+    amount_cents: int

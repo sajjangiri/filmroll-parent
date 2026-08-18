@@ -114,10 +114,13 @@ async def test_host_cannot_drop_the_guest_cap_below_headcount(
     too_low = await client.patch(f"/v1/films/{code}", json={"guest_cap": 1}, headers=auth(host))
     assert too_low.status_code == 409
 
-    raised = await client.patch(f"/v1/films/{code}", json={"guest_cap": 40}, headers=auth(host))
-    assert raised.status_code == 200
-    assert raised.json()["guest_cap"] == 40
-    assert raised.json()["shot_count"] == 0
+    unpaid = await client.patch(f"/v1/films/{code}", json={"guest_cap": 40}, headers=auth(host))
+    assert unpaid.status_code == 402
+
+    within = await client.patch(f"/v1/films/{code}", json={"guest_cap": 5}, headers=auth(host))
+    assert within.status_code == 200
+    assert within.json()["guest_cap"] == 5
+    assert within.json()["shot_count"] == 0
 
 
 async def test_cards_pdf_is_ours_and_names_the_film(client: AsyncClient, future: datetime) -> None:
