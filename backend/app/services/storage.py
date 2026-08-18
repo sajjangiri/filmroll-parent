@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 from functools import lru_cache
-from typing import Any
+from typing import Any, NamedTuple
 
 import boto3
 from botocore.client import Config
@@ -100,19 +100,36 @@ async def presign_get(key: str) -> str:
 # ------------------------------------------------------------------- operations
 
 
-async def object_exists(key: str) -> bool:
+class ObjectInfo(NamedTuple):
+    size: int
+    content_type: str
+
+
+async def stat_object(key: str) -> ObjectInfo | None:
+    """Size and declared type of a stored object, or None when it is absent.
+
+    A presigned PUT names the key and content type but cannot bound the body,
+    so this is how the API learns what a client actually uploaded.
+    """
     settings = get_settings()
 
-    def _head() -> bool:
+    def _head() -> ObjectInfo | None:
         try:
-            _internal_client().head_object(Bucket=settings.s3_bucket, Key=key)
+            response = _internal_client().head_object(Bucket=settings.s3_bucket, Key=key)
         except ClientError as exc:
             if exc.response["Error"]["Code"] in {"404", "NoSuchKey", "NotFound"}:
-                return False
+                return None
             raise
-        return True
+        return ObjectInfo(
+            size=int(response.get("ContentLength", 0)),
+            content_type=str(response.get("ContentType", "")).lower(),
+        )
 
     return await asyncio.to_thread(_head)
+
+
+async def object_exists(key: str) -> bool:
+    return await stat_object(key) is not None
 
 
 async def delete_prefix(prefix: str) -> int:

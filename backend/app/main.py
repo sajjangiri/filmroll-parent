@@ -8,6 +8,7 @@ from app.api.v1 import films, health
 from app.core.config import get_settings
 from app.core.logging import configure_logging, get_logger
 from app.db.session import dispose_engine
+from app.services import ratelimit
 
 
 @asynccontextmanager
@@ -17,6 +18,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     get_logger(__name__).info("api.startup", environment=settings.environment)
     yield
     await dispose_engine()
+    await ratelimit.close()
 
 
 def create_app() -> FastAPI:

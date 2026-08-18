@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 
 from app.api.deps import DbSession, FilmDep, GuestPrincipal, HostPrincipal
 from app.core.config import get_settings
@@ -21,11 +21,24 @@ from app.schemas import (
     ReserveResponse,
 )
 from app.services import films as films_service
-from app.services import storage, tokens
+from app.services import qrcodes, ratelimit, storage, tokens
 from app.services.dispatch import enqueue_after_commit
 
 router = APIRouter(prefix="/v1/films", tags=["films"])
 log = get_logger(__name__)
+
+
+def _client_ip(request: Request) -> str:
+    """Best-effort caller identity for rate limiting.
+
+    X-Forwarded-For is spoofable unless a trusted proxy rewrites it, so this is
+    a speed bump rather than an authorisation decision. It is only ever used to
+    slow down joins, never to grant access.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
 
 
 async def _to_public(
@@ -42,6 +55,7 @@ async def _to_public(
         shot_limit=film.shot_limit,
         guest_cap=film.guest_cap,
         guest_count=await films_service.guest_count(session, film.id),
+        join_url=qrcodes.join_url(film.code),
     )
 
 
@@ -72,9 +86,23 @@ async def get_film(view: FilmDep, session: DbSession) -> FilmPublic:
 
 
 @router.post("/{code}/join", response_model=JoinResponse, status_code=status.HTTP_201_CREATED)
-async def join(payload: JoinRequest, view: FilmDep, session: DbSession) -> JoinResponse:
+async def join(
+    payload: JoinRequest, view: FilmDep, session: DbSession, request: Request
+) -> JoinResponse:
     if view.is_closed:
         raise HTTPException(status.HTTP_410_GONE, "this film has closed")
+
+    settings = get_settings()
+    if not await ratelimit.allow(
+        "join",
+        f"{view.film.code}:{_client_ip(request)}",
+        limit=settings.rate_limit_join_per_hour,
+        window_seconds=3600,
+    ):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, "too many joins, slow down"
+        )
+
     try:
         guest = await films_service.join_film(session, view.film, payload.display_name)
     except films_service.GuestCapReached:
@@ -108,6 +136,18 @@ async def reserve_shot(
     """
     if view.is_closed:
         raise HTTPException(status.HTTP_410_GONE, "this film has closed")
+
+    # Keyed on the guest, not the address, because a venue puts every phone
+    # behind one NAT and an address-based limit would throttle the whole party.
+    if not await ratelimit.allow(
+        "reserve",
+        str(principal.guest_id),
+        limit=get_settings().rate_limit_reserve_per_minute,
+        window_seconds=60,
+    ):
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS, "too many uploads, slow down"
+        )
 
     try:
         key, already = await films_service.reserve_shot(
@@ -153,6 +193,18 @@ async def commit_shot(
         raise HTTPException(
             status.HTTP_409_CONFLICT, "no uploaded file found for this shot"
         ) from None
+    except films_service.ShotExpired:
+        raise HTTPException(
+            status.HTTP_409_CONFLICT, "this shot expired, reserve a new one"
+        ) from None
+    except films_service.UploadTooLarge as exc:
+        raise HTTPException(
+            status.HTTP_413_CONTENT_TOO_LARGE, f"photo is too large: {exc}"
+        ) from None
+    except films_service.UploadTypeRejected as exc:
+        raise HTTPException(
+            status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, f"unsupported photo type: {exc}"
+        ) from None
 
     # Held until this request's transaction commits. Dispatching inline would
     # let a worker look for a row that is not visible yet.
@@ -163,6 +215,26 @@ async def commit_shot(
     )
     return CommitResponse(
         shot_id=shot.id, state=str(shot.state.value), shots_remaining=remaining
+    )
+
+
+@router.get("/{code}/qr.svg", response_class=Response)
+async def join_qr(view: FilmDep) -> Response:
+    """QR code for the printed card and the host screen.
+
+    Served from here rather than a third-party image API. The join URL names a
+    private event, and posting every one of them to an outside service hands
+    over a guest list nobody agreed to share.
+    """
+    svg = qrcodes.join_qr_svg(view.film.code)
+    return Response(
+        content=svg,
+        media_type="image/svg+xml",
+        headers={
+            # The code is fixed for the life of the film, so this is safe to keep.
+            "Cache-Control": "public, max-age=3600",
+            "Content-Disposition": f'inline; filename="filmroll-{view.film.code}.svg"',
+        },
     )
 
 

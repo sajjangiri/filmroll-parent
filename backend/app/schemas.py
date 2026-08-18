@@ -40,6 +40,9 @@ class FilmPublic(BaseModel):
     shot_limit: int
     guest_cap: int
     guest_count: int
+    # Built server-side so the QR code, the host screen and a printed card all
+    # encode the same destination.
+    join_url: str
 
 
 class FilmCreated(BaseModel):

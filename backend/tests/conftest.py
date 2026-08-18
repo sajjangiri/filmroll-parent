@@ -25,6 +25,9 @@ os.environ["ENVIRONMENT"] = "ci"
 # signing yields SignatureDoesNotMatch.
 os.environ["S3_PUBLIC_ENDPOINT_URL"] = "http://minio:9000"
 os.environ["SECRET_KEY"] = "test-secret-key-at-least-32-bytes-long-for-hmac-sha256"
+# Small enough that the oversized-upload tests do not push 25 MB through MinIO.
+os.environ["MAX_UPLOAD_BYTES"] = "65536"
+os.environ["PUBLIC_WEB_URL"] = "http://localhost:3000"
 
 import uuid  # noqa: E402
 from collections.abc import AsyncIterator  # noqa: E402

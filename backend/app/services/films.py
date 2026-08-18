@@ -52,6 +52,18 @@ class UploadMissing(FilmError):
     pass
 
 
+class UploadTooLarge(FilmError):
+    pass
+
+
+class UploadTypeRejected(FilmError):
+    pass
+
+
+class ShotExpired(FilmError):
+    pass
+
+
 def generate_code() -> str:
     return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
 
@@ -235,10 +247,33 @@ async def commit_shot(
     if shot.state is ShotState.UPLOADED:
         return shot  # idempotent replay
 
+    # An expired slot has already been handed back, so the cap no longer counts
+    # it. Committing it now would put the photo in the gallery *and* leave the
+    # replacement slot outstanding, letting a guest shoot past the limit one
+    # rejected upload at a time. The id is spent; a retry must reserve a new one.
+    if shot.state is ShotState.EXPIRED:
+        raise ShotExpired(str(shot_id))
+
     # Trusting the client here would let a guest burn a slot with no photo, or
     # worse, put a row in the gallery that renders as a broken image.
-    if not await storage.object_exists(shot.storage_key):
+    info = await storage.stat_object(shot.storage_key)
+    if info is None:
         raise UploadMissing(str(shot_id))
+
+    # A presigned PUT bounds neither the size nor the real content of the body,
+    # so the only honest place to check is here, once the bytes exist. Rejected
+    # uploads are deleted rather than left to the sweeper: storage is billed by
+    # the byte, and the slot is handed straight back.
+    settings = get_settings()
+    if info.size > settings.max_upload_bytes:
+        await storage.delete_object(shot.storage_key)
+        await _release_reservation(session, shot_id)
+        raise UploadTooLarge(f"{info.size} bytes exceeds {settings.max_upload_bytes}")
+
+    if info.content_type not in settings.allowed_upload_type_set:
+        await storage.delete_object(shot.storage_key)
+        await _release_reservation(session, shot_id)
+        raise UploadTypeRejected(info.content_type or "unknown")
 
     # Timestamp comes from the database clock, not the API process, so ordering
     # stays consistent across replicas.
@@ -250,6 +285,23 @@ async def commit_shot(
     await session.flush()
     await session.refresh(shot)
     return shot
+
+
+async def _release_reservation(session: AsyncSession, shot_id: uuid.UUID) -> None:
+    """Hand a slot back after a rejected upload.
+
+    Marked EXPIRED rather than deleted so the row remains a record that the
+    attempt happened, and so commit_shot can refuse to resurrect the id.
+
+    Committed here rather than left to the request. Every caller raises straight
+    afterwards, and the session dependency rolls back on exception, so a plain
+    flush would be undone and the guest would silently lose a shot. Nothing else
+    has been written on this path, so there is no unrelated work to carry along.
+    """
+    await session.execute(
+        update(Shot).where(Shot.id == shot_id).values(state=ShotState.EXPIRED)
+    )
+    await session.commit()
 
 
 async def reveal_now(session: AsyncSession, film: Film) -> None:

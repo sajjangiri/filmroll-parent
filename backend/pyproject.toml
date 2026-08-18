@@ -20,6 +20,9 @@ dependencies = [
     "structlog>=24.4",
     "pyjwt>=2.10",
     "pillow>=11.0",
+    # Pure Python, no dependencies, emits SVG. Keeps join URLs off third-party
+    # servers and scales cleanly for printed table cards.
+    "segno>=1.6",
 ]
 
 [dependency-groups]

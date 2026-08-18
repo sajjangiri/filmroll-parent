@@ -44,9 +44,30 @@ class Settings(BaseSettings):
     download_url_ttl_seconds: int = 300
     reservation_ttl_minutes: int = 30
 
+    # Where guests land when they scan a QR code. The API builds the join URL
+    # itself so printed cards and the mobile app cannot disagree about it.
+    public_web_url: str = "http://localhost:3000"
+
+    # A presigned PUT is a capability: it names the key and the content type but
+    # cannot bound the body. Storage is billed by the byte, so the size is
+    # checked after the fact, on commit.
+    max_upload_bytes: int = 25 * 1024 * 1024
+    allowed_upload_types: str = "image/jpeg,image/png,image/webp,image/heic"
+
+    # Fixed-window limits. Generous enough that a real guest at an event never
+    # notices, tight enough that a script cannot exhaust a film.
+    rate_limit_join_per_hour: int = 20
+    rate_limit_reserve_per_minute: int = 30
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def allowed_upload_type_set(self) -> frozenset[str]:
+        return frozenset(
+            item.strip().lower() for item in self.allowed_upload_types.split(",") if item.strip()
+        )
 
     @property
     def is_production(self) -> bool:
