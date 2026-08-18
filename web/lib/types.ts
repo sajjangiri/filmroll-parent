@@ -1,31 +1,61 @@
-export type Guest = {
-  id: string;
-  name: string;
-  joinedAt: string;
-  shotsTaken: number;
+/**
+ * Shapes returned by the Filmroll API.
+ *
+ * Field names are snake_case because they mirror the backend responses exactly
+ * rather than being remapped on the way in. One less place for the two sides to
+ * drift apart.
+ */
+
+export type FilmPublic = {
+  code: string;
+  title: string;
+  event_type: string;
+  closes_at: string;
+  reveal_at: string;
+  is_developed: boolean;
+  is_closed: boolean;
+  shot_limit: number;
+  guest_cap: number;
+  guest_count: number;
 };
 
-export type Shot = {
-  id: string;
-  guestId: string;
-  guestName: string;
-  createdAt: string;
+export type FilmCreated = {
+  film: FilmPublic;
+  host_token: string;
+};
+
+export type JoinResponse = {
+  guest_id: string;
+  guest_token: string;
+  display_name: string;
+  shots_remaining: number;
+};
+
+export type ReserveResponse = {
+  shot_id: string;
+  upload_url: string;
+  storage_key: string;
+  expires_in: number;
+  already_reserved: boolean;
+  shots_remaining: number;
+};
+
+export type CommitResponse = {
+  shot_id: string;
+  state: string;
+  shots_remaining: number;
+};
+
+export type GalleryPhoto = {
+  shot_id: string;
+  guest_name: string;
+  uploaded_at: string | null;
   url: string;
 };
 
-export type Film = {
-  id: string;
-  code: string;
-  hostSecret: string;
-  title: string;
-  createdAt: string;
-  closesAt: string;
-  revealAt: string;
-  revealed: boolean;
-  shotLimit: number;
-  guestCap: number;
-  guests: Guest[];
-  shots: Shot[];
+export type GalleryResponse = {
+  is_developed: boolean;
+  shot_count: number;
+  /** Always empty until the film develops; the server mints no URLs before then. */
+  photos: GalleryPhoto[];
 };
-
-export type PublicFilm = Omit<Film, "hostSecret">;

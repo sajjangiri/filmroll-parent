@@ -1,41 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import type { PublicFilm } from "@/lib/types";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { ApiError, getFilm, loadHostToken, revealFilm } from "@/lib/api";
+import type { FilmPublic } from "@/lib/types";
+
+// The origin never changes for the life of the page, so there is nothing to
+// subscribe to. Reading it through useSyncExternalStore rather than an effect
+// gives the server an empty snapshot and the browser the real value, which is
+// what keeps hydration consistent.
+const neverChanges = () => () => {};
+const readOrigin = () => window.location.origin;
+const originOnServer = () => "";
 
 export function HostDashboard({ code }: { code: string }) {
-  const [film, setFilm] = useState<PublicFilm | null>(null);
-  const [joinUrl, setJoinUrl] = useState("");
+  const [film, setFilm] = useState<FilmPublic | null>(null);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const [revealing, setRevealing] = useState(false);
+
+  const origin = useSyncExternalStore(neverChanges, readOrigin, originOnServer);
+  const joinUrl = origin ? `${origin}/f/${code}` : "";
 
   useEffect(() => {
-    setJoinUrl(`${window.location.origin}/f/${code}`);
-    fetch(`/api/films/${code}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.film) setFilm(data.film);
-        else setError(data.error || "Film not found");
-      });
+    getFilm(code)
+      .then(setFilm)
+      .catch(() => setError("Film not found"));
   }, [code]);
 
   async function reveal() {
-    const hostSecret = window.localStorage.getItem(`filmroll-host-${code}`);
-    if (!hostSecret) {
-      setError("Host key missing. Create the film on this device.");
+    const hostToken = loadHostToken(code);
+    if (!hostToken) {
+      setError("Host key missing. Open this from the device that created the film.");
       return;
     }
-    const res = await fetch(`/api/films/${code}/reveal`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ hostSecret }),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      setError(data.error || "Could not reveal");
-      return;
+    setError("");
+    setRevealing(true);
+    try {
+      setFilm(await revealFilm(code, hostToken));
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 403
+          ? "That host key is not valid for this film."
+          : "Could not develop the film.",
+      );
+    } finally {
+      setRevealing(false);
     }
-    setFilm(data.film);
   }
 
   async function copy() {
@@ -47,23 +57,20 @@ export function HostDashboard({ code }: { code: string }) {
   if (error && !film) return <p className="text-red-400">{error}</p>;
   if (!film) return <p className="text-zinc-400">Loading host tools…</p>;
 
-  const developed = film.revealed || Date.now() >= Date.parse(film.revealAt);
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(joinUrl)}`;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-          Host
-        </p>
+        <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">Host</p>
         <h1 className="font-serif text-4xl text-white">{film.title}</h1>
         <p className="text-sm text-zinc-400">
-          {film.guests.length}/{film.guestCap} guests · {film.shots.length}{" "}
-          shots · {film.shotLimit} per camera
+          {film.guest_count}/{film.guest_cap} guests · {film.shot_limit} per camera
         </p>
       </header>
 
       <section className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
+        {/* Third-party QR endpoint returns a plain PNG; no optimizer needed. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={qrSrc} alt="Join QR code" width={240} height={240} />
         <p className="break-all text-center text-sm text-zinc-400">{joinUrl}</p>
@@ -77,21 +84,22 @@ export function HostDashboard({ code }: { code: string }) {
       </section>
 
       <section className="flex flex-col gap-3 text-sm text-zinc-300">
-        <p>Closes {new Date(film.closesAt).toLocaleString()}</p>
+        <p>Closes {new Date(film.closes_at).toLocaleString()}</p>
         <p>
-          {developed
+          {film.is_developed
             ? "Gallery is open."
-            : `Develops ${new Date(film.revealAt).toLocaleString()}`}
+            : `Develops ${new Date(film.reveal_at).toLocaleString()}`}
         </p>
         {error ? <p className="text-red-400">{error}</p> : null}
         <div className="flex gap-3">
-          {!developed ? (
+          {!film.is_developed ? (
             <button
               type="button"
               onClick={reveal}
-              className="rounded-full border border-zinc-600 px-5 py-2 text-sm"
+              disabled={revealing}
+              className="rounded-full border border-zinc-600 px-5 py-2 text-sm disabled:opacity-40"
             >
-              Develop now
+              {revealing ? "Developing…" : "Develop now"}
             </button>
           ) : (
             <a
@@ -101,7 +109,10 @@ export function HostDashboard({ code }: { code: string }) {
               Open gallery
             </a>
           )}
-          <a href={`/f/${code}`} className="rounded-full px-5 py-2 text-sm text-zinc-400">
+          <a
+            href={`/f/${code}`}
+            className="rounded-full px-5 py-2 text-sm text-zinc-400"
+          >
             Open guest camera
           </a>
         </div>

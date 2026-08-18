@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { createFilm, saveHostToken } from "@/lib/api";
 
 export function CreateFilmForm() {
   const router = useRouter();
@@ -18,25 +19,23 @@ export function CreateFilmForm() {
     setBusy(true);
     setError("");
     try {
-      const res = await fetch("/api/films", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title,
-          hoursOpen,
-          revealHours,
-          shotLimit,
-          guestCap,
-        }),
+      // The form asks for durations because that is how hosts think about an
+      // event; the API stores instants so the reveal rule stays a plain
+      // comparison against the database clock.
+      const now = Date.now();
+      const created = await createFilm({
+        title: title.trim() || "Untitled film",
+        event_type: "party",
+        closes_at: new Date(now + hoursOpen * 3_600_000).toISOString(),
+        reveal_at: new Date(now + revealHours * 3_600_000).toISOString(),
+        shot_limit: shotLimit,
+        guest_cap: guestCap,
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not create film");
-      const { film, hostSecret } = data as {
-        film: { code: string };
-        hostSecret: string;
-      };
-      window.localStorage.setItem(`filmroll-host-${film.code}`, hostSecret);
-      router.push(`/f/${film.code}/host`);
+
+      // The only copy of this token. Losing it means losing host control, which
+      // is the trade for hosts not having accounts.
+      saveHostToken(created.film.code, created.host_token);
+      router.push(`/f/${created.film.code}/host`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create film");
       setBusy(false);

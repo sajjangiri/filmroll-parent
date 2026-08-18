@@ -29,10 +29,22 @@ python3 scripts/smoke.py
 ## Architecture
 
 ```
-web/       Next.js, becoming the no-download guest camera
+web/       Next.js guest camera, no download required
 mobile/    Expo host app (not started)
 backend/   FastAPI, Celery workers, Alembic migrations
 ```
+
+The browser talks to FastAPI directly and uploads to storage with a presigned
+URL. Next.js serves the interface and nothing else, so no photo or credential
+passes through it.
+
+```bash
+cd web && cp .env.example .env.local && npm install && npm run dev
+```
+
+`NEXT_PUBLIC_API_URL` must be a host the *phone* can resolve. Testing on a real
+device means using the machine's LAN address and adding that same origin to
+`CORS_ORIGINS` in the backend `.env`.
 
 Services, all defined in `docker-compose.yml`:
 
@@ -91,6 +103,24 @@ Tests run against real Postgres, Redis and MinIO on a dedicated database and
 bucket. SQLite is not substituted: cap enforcement is a raw conditional insert
 with row locks and reveal evaluates Postgres `now()`, so an in-memory database
 would exercise behaviour that does not ship.
+
+The burst test is separate because it is slow and writes to the development
+database:
+
+```bash
+./scripts/loadtest.sh
+```
+
+It drives 50 guests shooting 20 photos each while sampling the API container's
+memory. Throughput is the less interesting half of the output. The point is the
+memory line: a recent run moved 109 MB of photos while the API peaked at 21 MiB
+above idle, which is the evidence that photo bytes bypass the app tier. Add an
+endpoint that proxies uploads and this is what will notice.
+
+It runs from the host rather than inside the compose network on purpose.
+Presigned URLs are signed against the public endpoint a phone would use, and
+SigV4 covers the Host header, so a client that rewrites the host to reach the
+internal service gets `SignatureDoesNotMatch`.
 
 Enable the push gate once per clone:
 
