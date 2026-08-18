@@ -78,6 +78,13 @@ class Settings(BaseSettings):
 
     rate_limit_recover_per_hour: int = 8
 
+    # Used to mint the Apple associated-domain file. TEAMID is a placeholder
+    # until App Store Connect exists; the route still has to be served so a
+    # CDN in front of us cannot 404 the well-known path.
+    apple_team_id: str = ""
+    ios_bundle_id: str = "app.filmroll"
+    ios_clip_bundle_id: str = "app.filmroll.Clip"
+
     @property
     def use_fake_billing(self) -> bool:
         if self.is_production:

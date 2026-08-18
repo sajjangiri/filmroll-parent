@@ -65,7 +65,9 @@ every film. You do **not** register an experience per event.
 ## Server configuration
 
 Serve this at `https://filmroll.app/.well-known/apple-app-site-association` with
-`Content-Type: application/json`, no redirects, no `.json` extension.
+`Content-Type: application/json`, no redirects, no `.json` extension. FastAPI
+already serves it (`APPLE_TEAM_ID` defaults to the `TEAMID` placeholder until
+App Store Connect exists). The clip itself is still unbuilt.
 
 ```json
 {
@@ -201,7 +203,8 @@ simulate an invocation URL.
 
 - [ ] Full iOS app approved and live on the App Store
 - [ ] Clip binary verified under 15 MB uncompressed after thinning
-- [ ] AASA served at `/.well-known/apple-app-site-association`, 200, no redirect
+- [x] AASA served at `/.well-known/apple-app-site-association`, 200, no redirect
+      (placeholder Team ID until App Store Connect exists)
 - [ ] `appclips:filmroll.app` in the clip's associated-domains entitlement
 - [ ] Advanced App Clip Experience created with prefix `https://filmroll.app/f/`
 - [ ] Card image, title, subtitle, and action verb set for the experience

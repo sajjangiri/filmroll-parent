@@ -61,4 +61,15 @@ else
   echo "pre-push: skipping web checks, run npm install in web/ to enable them"
 fi
 
+if [[ -d mobile/node_modules ]]; then
+  echo "pre-push: checking mobile types"
+  if ! (cd mobile && npx tsc --noEmit); then
+    echo >&2
+    echo "pre-push: mobile checks failed, push aborted." >&2
+    exit 1
+  fi
+else
+  echo "pre-push: skipping mobile checks, run npm install in mobile/ to enable them"
+fi
+
 echo "pre-push: all checks passed"

@@ -29,8 +29,8 @@ python3 scripts/smoke.py
 ## Architecture
 
 ```
-web/       Next.js guest camera, no download required
-mobile/    Expo host app (not started)
+web/       Next.js guest camera + host tools, no download required
+mobile/    Expo guest camera (iOS/Android). Hosts stay on the web.
 backend/   FastAPI, Celery workers, Alembic migrations
 ```
 
@@ -45,6 +45,18 @@ cd web && cp .env.example .env.local && npm install && npm run dev
 `NEXT_PUBLIC_API_URL` must be a host the *phone* can resolve. Testing on a real
 device means using the machine's LAN address and adding that same origin to
 `CORS_ORIGINS` in the backend `.env`.
+
+The native guest camera lives in `mobile/`. Hosts still create, pay, and
+moderate on the web — that is the 30% App Store tax decision.
+
+```bash
+cd mobile && cp .env.example .env && npm start
+```
+
+On a physical phone set `EXPO_PUBLIC_API_URL` to the machine's LAN address.
+The App Clip is not this app: it cannot ship until a full iOS binary is on the
+App Store. `GET /.well-known/apple-app-site-association` is already served so
+the domain file is not the thing we scramble for later.
 
 The guest camera is an installable PWA. Tapping the shutter writes the JPEG to
 IndexedDB first; a drain loop uploads when the network returns. Putting the

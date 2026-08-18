@@ -34,7 +34,7 @@ Legend:
 | QR code join | done | 0 | P0 | all |
 | Share link join | done | 0 | P0 | all |
 | No account, name only | done | 0 | P0 | all |
-| Guest identity persists on device | done | 0 | P0 | web, clip |
+| Guest identity persists on device | done | 0 | P0 | web, ios, clip |
 | **App Clip launch from QR (no download)** | todo | 5 | P1 | clip |
 | App Clip Codes (Apple visual code) | todo | 5 | P2 | clip |
 | NFC table tags | todo | 6 | P2 | ios, android |
@@ -49,9 +49,10 @@ Legend:
 | Feature | Status | Phase | Pri | Surface |
 |---|---|---|---|---|
 | In-browser camera capture | done | 0 | P0 | web, clip |
+| Native camera capture | done | 5 | P1 | ios |
 | Server-enforced shot limit | done | 0 | P0 | api |
 | Shot counter ("8 left") | done | 0 | P0 | web, ios, clip |
-| **Offline capture + upload queue** | done | 2 | P0 | web, ios |
+| **Offline capture + upload queue** | done | 2 | P0 | web |
 | Retry with backoff, resumable upload | done | 2 | P0 | web |
 | Visible upload queue state | done | 2 | P0 | web |
 | Front / back camera switch | done | 2 | P0 | web, ios, clip |

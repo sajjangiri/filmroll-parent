@@ -1,0 +1,45 @@
+{
+  "expo": {
+    "name": "Filmroll",
+    "slug": "filmroll",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "scheme": "filmroll",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.filmroll",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to take photos for the event you joined."
+      },
+      "associatedDomains": ["applinks:filmroll.app"]
+    },
+    "android": {
+      "package": "app.filmroll",
+      "adaptiveIcon": {
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Used to take photos for the event you joined."
+        }
+      ]
+    ]
+  }
+}

@@ -53,5 +53,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# expo
+.expo/
+web-build/
+dist/
+
 # vercel
 .vercel

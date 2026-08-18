@@ -139,16 +139,17 @@ tier, the cap still rises, and no money moves. Production ignores the fake flag.
 
 ---
 
-## Phase 5 — Native iOS + App Clip `P1`
+## Phase 5 — Native iOS + App Clip `IN PROGRESS`
 
 Full spec in `docs/app-clip.md`. Summary of the order:
 
-- [ ] SwiftUI full app: host management + guest camera + gallery
+- [x] Expo guest app: join by code, native camera, gallery after develop
+- [ ] Host management in the native app (today that stays on the web)
 - [ ] StoreKit 2 IAP in the **full app only** (App Clips cannot do IAP)
 - [ ] **Publish the full app to the App Store** — hard prerequisite
 - [ ] App Clip target, budget **≤15 MB uncompressed** (QR invocation limit)
 - [ ] `Associated Domains` entitlement: `appclips:filmroll.app`
-- [ ] Serve `/.well-known/apple-app-site-association` with the `appclips` key
+- [x] Serve `/.well-known/apple-app-site-association` with the `appclips` key
 - [ ] Advanced App Clip Experience in App Store Connect, URL prefix
       `https://filmroll.app/f/`
 - [ ] Clip reads `NSUserActivity.webpageURL` → parses film code → joins → camera
