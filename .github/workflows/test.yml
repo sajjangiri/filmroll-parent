@@ -1,0 +1,65 @@
+name: test
+
+# Inert until a remote exists. Once one is added this runs unchanged, and the
+# `test` job is the check to mark as required in branch protection.
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# A newer push supersedes an in-flight run on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: backend tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create environment file
+        run: cp .env.example .env
+
+      # Same images and same wiring as local development, so a pass here means
+      # the same thing it means on a laptop.
+      - name: Start dependencies
+        run: docker compose up -d --wait db redis minio minio-init
+
+      - name: Build API image
+        run: docker compose build api
+
+      - name: Run migrations
+        run: docker compose run --rm api alembic upgrade head
+
+      - name: Run test suite
+        run: docker compose run --rm api pytest -m "not load" -q
+
+      - name: Dump service logs on failure
+        if: failure()
+        run: docker compose logs --no-color
+
+  lint:
+    name: lint and types
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          working-directory: backend
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --frozen --all-groups
+
+      - name: Ruff
+        working-directory: backend
+        run: uv run ruff check .
+
+      - name: Mypy
+        working-directory: backend
+        run: uv run mypy app

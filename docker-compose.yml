@@ -1,0 +1,131 @@
+name: filmroll
+
+# Shared definition for every Python service. They run the same image and
+# differ only in the command they execute.
+x-backend: &backend
+  build:
+    context: ./backend
+    target: runtime
+  env_file: [.env]
+  depends_on:
+    db: {condition: service_healthy}
+    redis: {condition: service_healthy}
+    minio: {condition: service_healthy}
+  restart: unless-stopped
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-filmroll}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-filmroll}
+      POSTGRES_DB: ${POSTGRES_DB:-filmroll}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-filmroll} -d ${POSTGRES_DB:-filmroll}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Broker state is not the source of truth, but appendonly avoids losing
+    # queued jobs across a restart during development.
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY_ID:-filmroll}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_ACCESS_KEY:-filmroll-dev-secret}
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    restart: unless-stopped
+
+  # Creates the bucket and, critically, asserts it is not publicly readable.
+  # Photos are served exclusively through short-lived signed URLs.
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio: {condition: service_healthy}
+    env_file: [.env]
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 $${S3_ACCESS_KEY_ID} $${S3_SECRET_ACCESS_KEY} &&
+      mc mb --ignore-existing local/$${S3_BUCKET} &&
+      mc anonymous set none local/$${S3_BUCKET} &&
+      echo 'bucket ready and private'
+      "
+    restart: "no"
+
+  api:
+    <<: *backend
+    depends_on:
+      db: {condition: service_healthy}
+      redis: {condition: service_healthy}
+      minio: {condition: service_healthy}
+      minio-init: {condition: service_completed_successfully}
+
+  worker-fast:
+    <<: *backend
+    command: celery -A app.worker.celery_app worker -Q fast --concurrency 4 --loglevel info
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.worker.celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  worker-media:
+    <<: *backend
+    build:
+      context: ./backend
+      target: media
+    command: celery -A app.worker.celery_app worker -Q media --concurrency 1 --loglevel info
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.worker.celery_app inspect ping -d celery@$$HOSTNAME"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  beat:
+    <<: *backend
+    command: celery -A app.worker.celery_app beat --loglevel info
+    # Inherits the API image, whose HTTP healthcheck can never pass here
+    # because the scheduler serves no HTTP. Beat is also not on the critical
+    # path: reveal is a derived value, so a stalled scheduler delays
+    # notifications and cleanup but cannot prevent a film from developing.
+    healthcheck:
+      disable: true
+
+  # Optional. Start with:  docker compose --profile tools up -d
+  flower:
+    <<: *backend
+    command: celery -A app.worker.celery_app flower --port=5555
+    ports: ["5555:5555"]
+    profiles: [tools]
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:

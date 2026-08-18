@@ -1,0 +1,149 @@
+# Filmroll — full feature list
+
+Legend:
+
+- **Status** — `done` (shipped in the prototype), `todo`
+- **Phase** — see `ROADMAP.md`
+- **Priority** — `P0` cannot launch without it · `P1` needed to win a wedding ·
+  `P2` moat / later
+- **Surface** — `web` PWA guest+host · `ios` full native app · `clip` App Clip ·
+  `android` · `api` server
+
+---
+
+## 1. Film / event lifecycle
+
+| Feature | Status | Phase | Pri | Surface |
+|---|---|---|---|---|
+| Create a film (name, cover, event type) | done | 0 | P0 | web, ios |
+| Set how long the film stays open | done | 0 | P0 | web, ios |
+| Set reveal / develop time | done | 0 | P0 | web, ios |
+| Shots per guest (film roll size) | done | 0 | P0 | web, ios |
+| Guest cap | done | 0 | P0 | web, ios |
+| Short film code (6 chars, QR-friendly) | done | 0 | P0 | api |
+| Instant reveal mode (live gallery) | todo | 3 | P1 | web, ios |
+| Extend time / raise cap mid-event | todo | 3 | P1 | web, ios |
+| Multiple rolls per event (ceremony / party) | todo | 6 | P2 | web, ios |
+| Duplicate a past film as a template | todo | 6 | P2 | web |
+| Archive / delete a film | todo | 3 | P1 | web, ios |
+
+## 2. Guest join
+
+| Feature | Status | Phase | Pri | Surface |
+|---|---|---|---|---|
+| QR code join | done | 0 | P0 | all |
+| Share link join | done | 0 | P0 | all |
+| No account, name only | done | 0 | P0 | all |
+| Guest identity persists on device | done | 0 | P0 | web, clip |
+| **App Clip launch from QR (no download)** | todo | 5 | P1 | clip |
+| App Clip Codes (Apple visual code) | todo | 5 | P2 | clip |
+| NFC table tags | todo | 6 | P2 | ios, android |
+| Android/desktop fallback to PWA on same URL | todo | 2 | P0 | web |
+| Optional PIN on the film | todo | 3 | P1 | api |
+| Geo or time-window lock | todo | 6 | P2 | api |
+| Guest list import (CSV) | todo | 6 | P2 | web |
+| Smart App Banner offering the iOS app | todo | 5 | P1 | web |
+
+## 3. Camera + capture
+
+| Feature | Status | Phase | Pri | Surface |
+|---|---|---|---|---|
+| In-browser camera capture | done | 0 | P0 | web, clip |
+| Server-enforced shot limit | done | 0 | P0 | api |
+| Shot counter ("8 left") | done | 0 | P0 | web, ios, clip |
+| **Offline capture + upload queue** | todo | 2 | P0 | web, ios |
+| Retry with backoff, resumable upload | todo | 2 | P0 | web, ios |
+| Visible upload queue state | todo | 2 | P0 | web, ios |
+| Front / back camera switch | todo | 2 | P0 | web, ios, clip |
+| Flash / torch | todo | 2 | P1 | web, ios, clip |
+| Live filter preview (WebGL / Core Image) | todo | 2 | P1 | web, ios |
+| Originals stored clean, look applied at display | todo | 1 | P1 | api |
+| Idempotent shot IDs (no double burn) | todo | 1 | P0 | api |
+| Camera-roll upload | todo | 6 | P2 | web, ios (**not** clip) |
+| Guest video clips (5–15s) | todo | 6 | P2 | web, ios |
+
+## 4. Reveal + gallery
+
+| Feature | Status | Phase | Pri | Surface |
+|---|---|---|---|---|
+| Delayed reveal | done | 0 | P0 | all |
+| Host "develop now" override | done | 0 | P0 | web, ios |
+| Per-photo attribution | done | 0 | P0 | all |
+| **Signed URLs that 403 before reveal** | todo | 1 | P0 | api |
+| Thumbnail / display derivatives | todo | 1 | P0 | api |
+| Bulk ZIP of originals | todo | 3 | P1 | web, ios |
+| Guest saves a single photo | todo | 3 | P1 | web, ios |
+| Reveal notification (email / push) | todo | 3 | P1 | web, ios |
+| Ephemeral reveal notification (8h/24h) | todo | 5 | P2 | clip |
+| Live slideshow for a venue screen | todo | 6 | P2 | web |
+| Recap video, 45–90s with music | todo | 6 | P2 | api |
+| Favorites / hearts | todo | 6 | P2 | web, ios |
+
+## 5. Host controls, trust and safety
+
+| Feature | Status | Phase | Pri | Surface |
+|---|---|---|---|---|
+| Host dashboard (guests, shots, health) | done | 0 | P0 | web, ios |
+| Durable host auth (magic link / Apple) | todo | 1 | P0 | web, ios |
+| **One-tap hide / moderation queue** | todo | 3 | P0 | web, ios |
+| Hidden photos never fan out | todo | 3 | P0 | api |
+| Co-hosts | todo | 3 | P1 | web, ios |
+| Photographer read-only seat | todo | 6 | P2 | web |
+| Guest deletes own photo | todo | 3 | P1 | web, ios |
+| Private vs shared visibility | todo | 3 | P1 | web, ios |
+| Report a photo | todo | 3 | P1 | web |
+| NSFW detection assist (host decides) | todo | 6 | P2 | api |
+| Print-ready QR table cards (PDF) | todo | 3 | P1 | web |
+
+## 6. Billing
+
+| Feature | Status | Phase | Pri | Surface |
+|---|---|---|---|---|
+| Free tier (5 guests, full features) | todo | 4 | P0 | api |
+| **Stripe Checkout on web, by guest cap** | todo | 4 | P0 | web |
+| Server-side entitlement enforcement | todo | 4 | P0 | api |
+| Upgrade cap mid-event | todo | 4 | P1 | web, ios |
+| StoreKit 2 IAP (full app only) | todo | 5 | P1 | ios |
+| Unlimited-shots add-on | todo | 4 | P1 | web, ios |
+| Video pack add-on | todo | 6 | P2 | web, ios |
+| Keep-forever storage after 12 months | todo | 4 | P1 | web |
+| Photobook / prints | todo | 6 | P2 | web |
+| Planner / venue license, invoicing | todo | 6 | P2 | web |
+| Brand rights pack + event analytics | todo | 6 | P2 | web |
+
+## 7. Platform / infrastructure
+
+| Feature | Status | Phase | Pri | Surface |
+|---|---|---|---|---|
+| Postgres schema + migrations | todo | 1 | P0 | api |
+| Object storage, signed direct upload | todo | 1 | P0 | api |
+| Derivatives worker | todo | 1 | P0 | api |
+| Self-hosted QR generation | todo | 1 | P0 | api |
+| Rate limiting + abuse protection | todo | 1 | P0 | api |
+| Installable PWA + service worker | todo | 2 | P0 | web |
+| i18n (EN, ES, FR) | todo | 2 | P1 | web, ios |
+| Event-day observability dashboards | todo | 1 | P1 | api |
+| Associated domains + AASA | todo | 5 | P1 | api |
+| Android host app | todo | 6 | P2 | android |
+
+---
+
+## What an App Clip specifically cannot do
+
+These are Apple platform limits, not design choices. They decide what the QR
+experience can include. Details and sources in `docs/app-clip.md`.
+
+| Capability | In App Clip | Consequence for Filmroll |
+|---|---|---|
+| Camera + microphone | Yes | The guest camera works in the clip |
+| Photo library read/write | **No** | No camera-roll upload; save via share sheet |
+| Background upload / `URLSession` background | **No** | Uploads must finish while the clip is open |
+| In-app purchase | **No** | Host buys in the full app or on the web |
+| Persistent local storage | **No** (ephemeral, ~8h idle) | Guest identity must live server-side |
+| Push notifications | Ephemeral only (8h / 24h) | Reveal ping works only for a short window |
+| Location | When-in-use only | Geo-lock is possible, background geo is not |
+| Binary size (QR invocation) | **15 MB uncompressed** | Clip = camera + upload only, nothing else |
+
+**Design conclusion:** the App Clip is a thin capture surface. Every heavier
+job — browsing the gallery, downloading originals, paying, moderating — belongs to
+the web app or the full native app.

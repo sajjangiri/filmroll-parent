@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+#
+# Runs the fast test suite before a push to a protected branch.
+#
+# Enable once per clone:
+#     git config core.hooksPath .githooks
+#
+# This is a convenience gate, not a security boundary: `git push --no-verify`
+# skips it. Branch protection with a required CI check is what actually
+# enforces green tests.
+
+set -euo pipefail
+
+protected_re='^refs/heads/(main|develop)$'
+run=0
+
+# A pre-push hook receives the refs being pushed on stdin as
+#   <local ref> <local sha> <remote ref> <remote sha>
+# The branch you have checked out is not necessarily the one being pushed, so
+# the decision has to come from stdin.
+#
+# An `if` block rather than `[[ ... ]] && run=1`: under `set -e` a non-matching
+# test on the final iteration would exit the hook non-zero and reject a
+# perfectly good push.
+while read -r _local_ref _local_sha remote_ref _remote_sha; do
+  if [[ "$remote_ref" =~ $protected_re ]]; then
+    run=1
+  fi
+done
+
+if [[ $run -eq 0 ]]; then
+  exit 0
+fi
+
+echo "pre-push: protected branch detected, running fast test suite"
+
+if ! docker info >/dev/null 2>&1; then
+  echo "pre-push: Docker is not running, so tests cannot be verified." >&2
+  echo "          Start Docker, or bypass deliberately with --no-verify." >&2
+  exit 1
+fi
+
+if ! make test-fast; then
+  echo >&2
+  echo "pre-push: tests failed, push aborted." >&2
+  exit 1
+fi
+
+echo "pre-push: tests passed"

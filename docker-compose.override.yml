@@ -1,0 +1,36 @@
+# Applied automatically by `docker compose up` for local development.
+#
+# Ports are published here rather than in the base file so a deployed
+# environment does not inherit an exposed database. The source bind mount gives
+# hot reload; it lands on /app while the virtualenv sits at /opt/venv, so the
+# mount cannot shadow installed dependencies.
+
+services:
+  db:
+    ports: ["5432:5432"]
+
+  redis:
+    ports: ["6379:6379"]
+
+  minio:
+    ports:
+      - "9000:9000"   # S3 API, and the host presigned URLs are signed against
+      - "9001:9001"   # web console
+
+  api:
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ./backend:/app
+    ports: ["${API_PORT:-8000}:8000"]
+
+  worker-fast:
+    volumes:
+      - ./backend:/app
+
+  worker-media:
+    volumes:
+      - ./backend:/app
+
+  beat:
+    volumes:
+      - ./backend:/app
