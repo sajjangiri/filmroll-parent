@@ -42,8 +42,23 @@ fi
 
 if ! make test-fast; then
   echo >&2
-  echo "pre-push: tests failed, push aborted." >&2
+  echo "pre-push: backend tests failed, push aborted." >&2
   exit 1
 fi
 
-echo "pre-push: tests passed"
+# Types and lint only. The production build is left to CI, because it roughly
+# triples the time a push waits and catches little the type check does not.
+# Skipped rather than failed when dependencies are absent, so someone working
+# only on the backend is not forced to install them.
+if [[ -d web/node_modules ]]; then
+  echo "pre-push: checking web types and lint"
+  if ! (cd web && npx tsc --noEmit && npx eslint .); then
+    echo >&2
+    echo "pre-push: web checks failed, push aborted." >&2
+    exit 1
+  fi
+else
+  echo "pre-push: skipping web checks, run npm install in web/ to enable them"
+fi
+
+echo "pre-push: all checks passed"

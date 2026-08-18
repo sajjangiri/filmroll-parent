@@ -128,9 +128,12 @@ Enable the push gate once per clone:
 git config core.hooksPath .githooks
 ```
 
-Pushes to `main` or `develop` then run the fast suite first. It is a
-convenience, not a boundary, since `--no-verify` bypasses it; branch protection
-with a required CI check is the real enforcement.
+Pushes to `main` or `develop` then run the backend suite plus the web type check
+and lint. The production build is left to CI, since it roughly triples the wait
+and catches little the type check does not.
+
+This is a convenience, not a boundary: `--no-verify` bypasses it. Branch
+protection with a required CI check is the real enforcement.
 
 ## Going to production
 
