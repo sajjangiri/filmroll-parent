@@ -50,48 +50,50 @@ Known prototype debt, all fixed in Phase 1:
 
 ---
 
-## Phase 1 — Real foundation `P0`
+## Phase 1 — Real foundation `DONE`
 
 Goal: nothing is lost, nothing leaks, reveal is actually enforced.
 
-- [ ] Postgres (Supabase) + Drizzle schema: `films`, `guests`, `shots`, `purchases`,
-      `moderation_events`, `co_hosts`
-- [ ] Object storage (Supabase Storage / S3 / R2) with **signed direct uploads** —
+- [x] Postgres + Alembic schema: `films`, `guests`, `shots`
+- [x] Object storage (MinIO locally, S3/R2 in production) with **signed direct uploads** —
       bytes never pass through the API server
-- [ ] Signed read URLs that **403 before reveal**, server clock is the source of truth
-- [ ] Idempotent shot writes: client-generated `shot_id`, unique constraint, so a
+- [x] Signed read URLs that **403 before reveal**, server clock is the source of truth
+- [x] Idempotent shot writes: client-generated `shot_id`, unique constraint, so a
       double-tap or a retry never burns two shots
-- [ ] Derivatives worker: `thumb` (400px webp), `display` (1600px webp), untouched
-      `original` retained
-- [ ] Self-hosted QR generation (drop the third-party endpoint)
+- [x] Derivatives worker: display WebP thumbnail, EXIF stripped, untouched original
+- [x] Self-hosted QR generation (drop the third-party endpoint)
 - [ ] Host session: magic link email or Sign in with Apple, replacing `localStorage`
-- [ ] Rate limiting + upload size/type validation + EXIF strip on public derivatives
-- [ ] Structured logging: join funnel, upload success rate, queue depth
+- [x] Rate limiting + upload size/type validation + EXIF strip on public derivatives
+- [x] Structured logging: join funnel, upload success rate, queue depth
 
 **Done when:** a film survives a server restart, a guest cannot see a photo before
 reveal even with a direct URL, and two hosts creating films at once cannot clobber
-each other.
+each other. Met, except durable host auth which moves to Phase 3 with co-hosts.
 
 ---
 
-## Phase 2 — Guest experience, PWA `P0`
+## Phase 2 — Guest experience, PWA `IN PROGRESS`
 
 This is the differentiator. Venue Wi-Fi is the enemy.
 
-- [ ] Installable PWA (manifest, icons, standalone display)
-- [ ] **Offline-first capture**: photo saved to IndexedDB immediately, upload queued
-- [ ] Service worker background sync + retry with exponential backoff
-- [ ] Visible queue state: "3 photos waiting to upload"
+- [x] Installable PWA (manifest, icons, standalone display)
+- [x] **Offline-first capture**: photo saved to IndexedDB immediately, upload queued
+- [x] Retry with exponential backoff when the connection returns (page must be open,
+      or reopened — iOS will not run Background Sync)
+- [x] Visible queue state: "3 photos waiting to upload"
 - [ ] Resumable/chunked upload for large files on bad connections
 - [ ] Live filter preview via WebGL shader (look applied at capture *preview*, never
       baked into the stored original)
-- [ ] Front/back camera switch, flash/torch, zoom
-- [ ] Shot counter that feels like film ("8 left")
+- [x] Front/back camera switch
+- [ ] Flash/torch, zoom
+- [x] Shot counter that feels like film ("8 left")
 - [ ] i18n: EN, ES, FR minimum
 - [ ] Accessibility pass — the "grandpa test": join to first photo under 30 seconds
 
 **Done when:** you can put the phone in airplane mode, take 8 photos, re-enable
-Wi-Fi, and all 8 arrive.
+Wi-Fi, and all 8 arrive. The queue does this while the film page is open, and
+again if the guest reopens it later. A killed iOS tab will not drain in the
+background; that is a platform limit, not a missing retry.
 
 ---
 

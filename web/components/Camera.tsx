@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ApiError, captureShot } from "@/lib/api";
+import { useUploadQueue } from "@/lib/use-upload-queue";
 import type { FilmPublic } from "@/lib/types";
 
 type Props = {
@@ -25,6 +25,19 @@ export function Camera({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [facing, setFacing] = useState<"environment" | "user">("environment");
+  const [closed, setClosed] = useState(false);
+
+  const { snapshot, enqueue, waiting } = useUploadQueue(code, {
+    token,
+    onRemainingChange,
+    onUnauthorized,
+    onClosed: () => {
+      setClosed(true);
+      setError("This film has closed.");
+    },
+  });
+
+  const left = Math.max((remaining ?? film.shot_limit) - waiting, 0);
 
   useEffect(() => {
     let stream: MediaStream | undefined;
@@ -53,7 +66,7 @@ export function Camera({
 
   const shoot = useCallback(async () => {
     const video = videoRef.current;
-    if (!video || busy || remaining === 0) return;
+    if (!video || busy || left <= 0 || closed) return;
 
     setBusy(true);
     setError("");
@@ -70,27 +83,16 @@ export function Camera({
       );
       if (!photo) throw new Error("Could not capture");
 
-      // Reserves a slot, uploads straight to storage, then confirms. Retries
-      // inside reuse the same shot id, so a flaky connection cannot burn shots.
-      const committed = await captureShot(code, token, photo);
-      onRemainingChange(committed.shots_remaining);
-    } catch (err) {
-      if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
-        onUnauthorized();
-      } else if (err instanceof ApiError && err.status === 409) {
-        setError("Your roll is finished.");
-        onRemainingChange(0);
-      } else if (err instanceof ApiError && err.status === 410) {
-        setError("This film has closed.");
-      } else {
-        setError("That shot did not save. Try again.");
-      }
+      // Disk first, network later. The shutter must not wait for venue wifi.
+      await enqueue(photo);
+    } catch {
+      setError("That shot did not save on this device. Try again.");
     } finally {
       setBusy(false);
     }
-  }, [busy, code, onRemainingChange, onUnauthorized, remaining, token]);
+  }, [busy, closed, enqueue, left]);
 
-  const empty = remaining === 0;
+  const empty = left <= 0;
 
   return (
     <div className="flex flex-col gap-4">
@@ -105,7 +107,7 @@ export function Camera({
         <div className="pointer-events-none absolute inset-x-0 top-0 flex justify-between p-4 text-sm text-white">
           <span>{film.title}</span>
           <span>
-            {remaining ?? film.shot_limit} / {film.shot_limit}
+            {left} / {film.shot_limit}
           </span>
         </div>
         <button
@@ -117,12 +119,28 @@ export function Camera({
         </button>
       </div>
 
+      {waiting > 0 ? (
+        <p className="text-center text-sm text-zinc-400" role="status">
+          {snapshot.uploading > 0
+            ? `Uploading… ${waiting} waiting`
+            : navigatorOnLine()
+              ? `${waiting} ${waiting === 1 ? "photo" : "photos"} waiting to upload`
+              : `Offline · ${waiting} ${waiting === 1 ? "photo" : "photos"} saved on this phone`}
+        </p>
+      ) : null}
+
+      {snapshot.failed > 0 ? (
+        <p className="text-center text-sm text-red-400">
+          {snapshot.failed} {snapshot.failed === 1 ? "shot" : "shots"} could not be uploaded.
+        </p>
+      ) : null}
+
       {error ? <p className="text-sm text-red-400">{error}</p> : null}
 
       <button
         type="button"
         onClick={shoot}
-        disabled={busy || empty}
+        disabled={busy || empty || closed}
         className="mx-auto h-20 w-20 rounded-full border-4 border-white bg-white/90 disabled:opacity-40"
         aria-label="Take photo"
       />
@@ -134,4 +152,8 @@ export function Camera({
       ) : null}
     </div>
   );
+}
+
+function navigatorOnLine(): boolean {
+  return typeof navigator === "undefined" ? true : navigator.onLine;
 }

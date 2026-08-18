@@ -17,6 +17,7 @@ export type FilmPublic = {
   shot_limit: number;
   guest_cap: number;
   guest_count: number;
+  join_url: string;
 };
 
 export type FilmCreated = {

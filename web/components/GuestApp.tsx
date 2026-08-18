@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Camera } from "@/components/Camera";
+import { InstallHint } from "@/components/InstallHint";
 import {
   ApiError,
   clearGuestToken,
@@ -65,7 +66,9 @@ export function GuestApp({ code }: { code: string }) {
           ? "This film is full."
           : err instanceof ApiError && err.status === 410
             ? "This film has closed."
-            : "Could not join this film.",
+            : err instanceof ApiError && err.status === 429
+              ? "Too many attempts. Wait a moment and try again."
+              : "Could not join this film.",
       );
     } finally {
       setJoining(false);
@@ -94,6 +97,7 @@ export function GuestApp({ code }: { code: string }) {
         <p className="text-sm text-zinc-400">
           {film.guest_count}/{film.guest_cap} guests · {film.shot_limit} shots each
         </p>
+        <InstallHint />
       </header>
 
       {film.is_developed ? (

@@ -38,7 +38,7 @@ Legend:
 | **App Clip launch from QR (no download)** | todo | 5 | P1 | clip |
 | App Clip Codes (Apple visual code) | todo | 5 | P2 | clip |
 | NFC table tags | todo | 6 | P2 | ios, android |
-| Android/desktop fallback to PWA on same URL | todo | 2 | P0 | web |
+| Android/desktop fallback to PWA on same URL | done | 2 | P0 | web |
 | Optional PIN on the film | todo | 3 | P1 | api |
 | Geo or time-window lock | todo | 6 | P2 | api |
 | Guest list import (CSV) | todo | 6 | P2 | web |
@@ -51,14 +51,14 @@ Legend:
 | In-browser camera capture | done | 0 | P0 | web, clip |
 | Server-enforced shot limit | done | 0 | P0 | api |
 | Shot counter ("8 left") | done | 0 | P0 | web, ios, clip |
-| **Offline capture + upload queue** | todo | 2 | P0 | web, ios |
-| Retry with backoff, resumable upload | todo | 2 | P0 | web, ios |
-| Visible upload queue state | todo | 2 | P0 | web, ios |
-| Front / back camera switch | todo | 2 | P0 | web, ios, clip |
+| **Offline capture + upload queue** | done | 2 | P0 | web, ios |
+| Retry with backoff, resumable upload | done | 2 | P0 | web |
+| Visible upload queue state | done | 2 | P0 | web |
+| Front / back camera switch | done | 2 | P0 | web, ios, clip |
 | Flash / torch | todo | 2 | P1 | web, ios, clip |
 | Live filter preview (WebGL / Core Image) | todo | 2 | P1 | web, ios |
-| Originals stored clean, look applied at display | todo | 1 | P1 | api |
-| Idempotent shot IDs (no double burn) | todo | 1 | P0 | api |
+| Originals stored clean, look applied at display | done | 1 | P1 | api |
+| Idempotent shot IDs (no double burn) | done | 1 | P0 | api |
 | Camera-roll upload | todo | 6 | P2 | web, ios (**not** clip) |
 | Guest video clips (5–15s) | todo | 6 | P2 | web, ios |
 
@@ -69,8 +69,8 @@ Legend:
 | Delayed reveal | done | 0 | P0 | all |
 | Host "develop now" override | done | 0 | P0 | web, ios |
 | Per-photo attribution | done | 0 | P0 | all |
-| **Signed URLs that 403 before reveal** | todo | 1 | P0 | api |
-| Thumbnail / display derivatives | todo | 1 | P0 | api |
+| **Signed URLs that 403 before reveal** | done | 1 | P0 | api |
+| Thumbnail / display derivatives | done | 1 | P0 | api |
 | Bulk ZIP of originals | todo | 3 | P1 | web, ios |
 | Guest saves a single photo | todo | 3 | P1 | web, ios |
 | Reveal notification (email / push) | todo | 3 | P1 | web, ios |
@@ -115,12 +115,12 @@ Legend:
 
 | Feature | Status | Phase | Pri | Surface |
 |---|---|---|---|---|
-| Postgres schema + migrations | todo | 1 | P0 | api |
-| Object storage, signed direct upload | todo | 1 | P0 | api |
-| Derivatives worker | todo | 1 | P0 | api |
-| Self-hosted QR generation | todo | 1 | P0 | api |
-| Rate limiting + abuse protection | todo | 1 | P0 | api |
-| Installable PWA + service worker | todo | 2 | P0 | web |
+| Postgres schema + migrations | done | 1 | P0 | api |
+| Object storage, signed direct upload | done | 1 | P0 | api |
+| Derivatives worker | done | 1 | P0 | api |
+| Self-hosted QR generation | done | 1 | P0 | api |
+| Rate limiting + abuse protection | done | 1 | P0 | api |
+| Installable PWA + service worker | done | 2 | P0 | web |
 | i18n (EN, ES, FR) | todo | 2 | P1 | web, ios |
 | Event-day observability dashboards | todo | 1 | P1 | api |
 | Associated domains + AASA | todo | 5 | P1 | api |

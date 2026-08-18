@@ -15,7 +15,7 @@ import type {
   ReserveResponse,
 } from "@/lib/types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -200,4 +200,10 @@ export async function captureShot(
   throw lastError instanceof Error
     ? lastError
     : new Error("Could not upload this photo");
+}
+
+/** Errors that should stay in the queue and retry. Anything else is terminal. */
+export function isRetryableUploadError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return true;
+  return error.status === 429 || error.status >= 500;
 }

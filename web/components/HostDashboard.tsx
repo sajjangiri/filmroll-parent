@@ -1,13 +1,9 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { ApiError, getFilm, loadHostToken, revealFilm } from "@/lib/api";
+import { API_URL, ApiError, getFilm, loadHostToken, revealFilm } from "@/lib/api";
 import type { FilmPublic } from "@/lib/types";
 
-// The origin never changes for the life of the page, so there is nothing to
-// subscribe to. Reading it through useSyncExternalStore rather than an effect
-// gives the server an empty snapshot and the browser the real value, which is
-// what keeps hydration consistent.
 const neverChanges = () => () => {};
 const readOrigin = () => window.location.origin;
 const originOnServer = () => "";
@@ -19,7 +15,8 @@ export function HostDashboard({ code }: { code: string }) {
   const [revealing, setRevealing] = useState(false);
 
   const origin = useSyncExternalStore(neverChanges, readOrigin, originOnServer);
-  const joinUrl = origin ? `${origin}/f/${code}` : "";
+  const joinUrl = film?.join_url || (origin ? `${origin}/f/${code}` : "");
+  const qrSrc = `${API_URL}/v1/films/${code}/qr.svg`;
 
   useEffect(() => {
     getFilm(code)
@@ -49,6 +46,7 @@ export function HostDashboard({ code }: { code: string }) {
   }
 
   async function copy() {
+    if (!joinUrl) return;
     await navigator.clipboard.writeText(joinUrl);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
@@ -56,8 +54,6 @@ export function HostDashboard({ code }: { code: string }) {
 
   if (error && !film) return <p className="text-red-400">{error}</p>;
   if (!film) return <p className="text-zinc-400">Loading host tools…</p>;
-
-  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(joinUrl)}`;
 
   return (
     <div className="mx-auto flex w-full max-w-lg flex-col gap-8">
@@ -70,9 +66,10 @@ export function HostDashboard({ code }: { code: string }) {
       </header>
 
       <section className="flex flex-col items-center gap-4 rounded-2xl border border-zinc-800 bg-zinc-950 p-6">
-        {/* Third-party QR endpoint returns a plain PNG; no optimizer needed. */}
+        {/* Served by our API as SVG, not by a third-party image endpoint.
+            The join URL names a private event. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={qrSrc} alt="Join QR code" width={240} height={240} />
+        <img src={qrSrc} alt="Join QR code" width={240} height={240} className="rounded-lg bg-white p-2" />
         <p className="break-all text-center text-sm text-zinc-400">{joinUrl}</p>
         <button
           type="button"
