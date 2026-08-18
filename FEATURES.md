@@ -22,7 +22,7 @@ Legend:
 | Guest cap | done | 0 | P0 | web, ios |
 | Short film code (6 chars, QR-friendly) | done | 0 | P0 | api |
 | Instant reveal mode (live gallery) | todo | 3 | P1 | web, ios |
-| Extend time / raise cap mid-event | todo | 3 | P1 | web, ios |
+| Extend time / raise cap mid-event | done | 3 | P1 | web, ios |
 | Multiple rolls per event (ceremony / party) | todo | 6 | P2 | web, ios |
 | Duplicate a past film as a template | todo | 6 | P2 | web |
 | Archive / delete a film | todo | 3 | P1 | web, ios |
@@ -71,7 +71,7 @@ Legend:
 | Per-photo attribution | done | 0 | P0 | all |
 | **Signed URLs that 403 before reveal** | done | 1 | P0 | api |
 | Thumbnail / display derivatives | done | 1 | P0 | api |
-| Bulk ZIP of originals | todo | 3 | P1 | web, ios |
+| Bulk ZIP of originals | done | 3 | P1 | web, ios |
 | Guest saves a single photo | todo | 3 | P1 | web, ios |
 | Reveal notification (email / push) | todo | 3 | P1 | web, ios |
 | Ephemeral reveal notification (8h/24h) | todo | 5 | P2 | clip |
@@ -85,15 +85,15 @@ Legend:
 |---|---|---|---|---|
 | Host dashboard (guests, shots, health) | done | 0 | P0 | web, ios |
 | Durable host auth (magic link / Apple) | todo | 1 | P0 | web, ios |
-| **One-tap hide / moderation queue** | todo | 3 | P0 | web, ios |
-| Hidden photos never fan out | todo | 3 | P0 | api |
+| **One-tap hide / moderation queue** | done | 3 | P0 | web, ios |
+| Hidden photos never fan out | done | 3 | P0 | api |
 | Co-hosts | todo | 3 | P1 | web, ios |
 | Photographer read-only seat | todo | 6 | P2 | web |
-| Guest deletes own photo | todo | 3 | P1 | web, ios |
+| Guest deletes own photo | done | 3 | P1 | api |
 | Private vs shared visibility | todo | 3 | P1 | web, ios |
 | Report a photo | todo | 3 | P1 | web |
 | NSFW detection assist (host decides) | todo | 6 | P2 | api |
-| Print-ready QR table cards (PDF) | todo | 3 | P1 | web |
+| Print-ready QR table cards (PDF) | done | 3 | P1 | web |
 
 ## 6. Billing
 

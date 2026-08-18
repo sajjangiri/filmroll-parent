@@ -64,9 +64,7 @@ async def test_guest_cap_holds_under_parallel_joins(client: AsyncClient, future)
 
     async def join_once(n: int) -> int:
         async with _fresh_client() as c:
-            response = await c.post(
-                f"/v1/films/{code}/join", json={"display_name": f"G{n}"}
-            )
+            response = await c.post(f"/v1/films/{code}/join", json={"display_name": f"G{n}"})
             return response.status_code
 
     results = await asyncio.gather(*(join_once(n) for n in range(20)))
@@ -133,9 +131,7 @@ async def test_commit_without_an_upload_is_refused(client: AsyncClient, future):
         json={"shot_id": shot_id},
         headers=auth(token),
     )
-    response = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token)
-    )
+    response = await client.post(f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token))
     assert response.status_code == 409
 
 
@@ -144,9 +140,7 @@ async def test_committing_twice_is_idempotent(client: AsyncClient, future):
     token = await join(client, code)
     shot_id = await upload_shot(client, code, token)
 
-    again = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token)
-    )
+    again = await client.post(f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token))
     assert again.status_code == 200
     assert again.json()["state"] == "uploaded"
 

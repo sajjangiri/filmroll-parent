@@ -51,9 +51,7 @@ def _ensure_database() -> None:
     with psycopg.connect(
         "postgresql://filmroll:filmroll@db:5432/postgres", autocommit=True
     ) as conn:
-        exists = conn.execute(
-            "SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB,)
-        ).fetchone()
+        exists = conn.execute("SELECT 1 FROM pg_database WHERE datname = %s", (TEST_DB,)).fetchone()
         if not exists:
             conn.execute(f'CREATE DATABASE "{TEST_DB}"')
 
@@ -100,9 +98,7 @@ async def _clean_tables() -> AsyncIterator[None]:
 
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
-    async with AsyncClient(
-        transport=ASGITransport(app=app), base_url="http://test"
-    ) as ac:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         yield ac
 
 
@@ -179,8 +175,6 @@ async def upload_shot(
         put = await raw.put(url, content=TINY_JPEG, headers={"Content-Type": "image/jpeg"})
         assert put.status_code == 200, put.text
 
-    committed = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token)
-    )
+    committed = await client.post(f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token))
     assert committed.status_code == 200, committed.text
     return shot_id

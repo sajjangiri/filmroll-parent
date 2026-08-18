@@ -39,9 +39,7 @@ async def test_guest_cannot_use_host_endpoints(client: AsyncClient, future):
     guest = await join(client, code)
 
     reveal = await client.post(f"/v1/films/{code}/reveal", headers=auth(guest))
-    hide = await client.post(
-        f"/v1/films/{code}/shots/{uuid.uuid4()}/hide", headers=auth(guest)
-    )
+    hide = await client.post(f"/v1/films/{code}/shots/{uuid.uuid4()}/hide", headers=auth(guest))
     assert reveal.status_code == 403
     assert hide.status_code == 403
 
@@ -61,9 +59,7 @@ async def test_anonymous_requests_are_rejected(client: AsyncClient, future):
 
     assert (await client.post(f"/v1/films/{code}/reveal")).status_code == 401
     assert (
-        await client.post(
-            f"/v1/films/{code}/shots/reserve", json={"shot_id": str(uuid.uuid4())}
-        )
+        await client.post(f"/v1/films/{code}/shots/reserve", json={"shot_id": str(uuid.uuid4())})
     ).status_code == 401
 
 

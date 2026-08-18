@@ -62,9 +62,7 @@ async def test_reserve_is_rate_limited(
     """A single guest cannot spin the reserve endpoint without limit."""
     monkeypatch.setattr(get_settings(), "rate_limit_reserve_per_minute", 8)
     limit = 8
-    code, _ = await make_film(
-        client, closes_at=future, reveal_at=future, shot_limit=limit + 50
-    )
+    code, _ = await make_film(client, closes_at=future, reveal_at=future, shot_limit=limit + 50)
     token = await join(client, code)
 
     statuses = []
@@ -96,7 +94,5 @@ async def test_rate_limiting_fails_open(
     monkeypatch.setattr(ratelimit, "_redis", explode)
 
     code, _ = await make_film(client, closes_at=future, reveal_at=future)
-    response = await client.post(
-        f"/v1/films/{code}/join", json={"display_name": "Ada"}
-    )
+    response = await client.post(f"/v1/films/{code}/join", json={"display_name": "Ada"})
     assert response.status_code == 201, "join must still work without Redis"

@@ -142,9 +142,73 @@ def build_recap_video(self, film_id: str) -> None:  # type: ignore[no-untyped-de
     raise NotImplementedError("Phase 6")
 
 
-@celery_app.task(name="app.worker.tasks.build_export_archive", bind=True)
-def build_export_archive(self, film_id: str) -> None:  # type: ignore[no-untyped-def]
-    raise NotImplementedError("Phase 6")
+@celery_app.task(
+    name="app.worker.tasks.build_export_archive",
+    bind=True,
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def build_export_archive(self, film_id: str) -> str:  # type: ignore[no-untyped-def]
+    return build_export_archive_for_film(film_id)
+
+
+def build_export_archive_for_film(film_id: str) -> str:
+    """ZIP of non-hidden originals. Hidden shots must never leave this way."""
+    import zipfile
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
+
+    from sqlalchemy.orm import selectinload
+
+    from app.db.models import Film, Shot, ShotState
+    from app.services import exports
+
+    film_uuid = uuid.UUID(film_id)
+    key = storage.export_key(film_id, "originals")
+
+    with session_scope() as session:
+        film = session.get(Film, film_uuid)
+        if film is None:
+            exports.mark_failed_sync(film_id)
+            return "missing"
+        rows = list(
+            session.execute(
+                select(Shot)
+                .where(
+                    Shot.film_id == film_uuid,
+                    Shot.state == ShotState.UPLOADED,
+                    Shot.hidden_at.is_(None),
+                )
+                .options(selectinload(Shot.guest))
+                .order_by(Shot.uploaded_at)
+            )
+            .scalars()
+            .all()
+        )
+        code = film.code
+
+    try:
+        with TemporaryDirectory() as tmp:
+            zip_path = Path(tmp) / "originals.zip"
+            with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_STORED) as archive:
+                for index, shot in enumerate(rows, start=1):
+                    name = (
+                        "".join(
+                            ch for ch in shot.guest.display_name if ch.isalnum() or ch in " -_"
+                        ).strip()
+                        or "guest"
+                    )
+                    filename = f"{index:03d}-{name[:40]}-{str(shot.id)[:8]}.jpg"
+                    archive.writestr(filename, storage.download_bytes(shot.storage_key))
+            storage.upload_file(key, str(zip_path), "application/zip")
+    except Exception:
+        exports.mark_failed_sync(film_id)
+        raise
+
+    exports.mark_ready_sync(film_id)
+    log.info("export.ready", film_id=film_id, code=code, shots=len(rows))
+    return key
 
 
 def pending_derivative_ids(limit: int = 100) -> list[str]:

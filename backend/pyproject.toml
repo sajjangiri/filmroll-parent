@@ -23,6 +23,7 @@ dependencies = [
     # Pure Python, no dependencies, emits SVG. Keeps join URLs off third-party
     # servers and scales cleanly for printed table cards.
     "segno>=1.6",
+    "fpdf2>=2.8",
 ]
 
 [dependency-groups]
@@ -69,7 +70,7 @@ strict = true
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["celery.*", "testcontainers.*"]
+module = ["celery.*", "testcontainers.*", "fpdf.*"]
 ignore_missing_imports = true
 
 # Celery ships no type stubs, so every @task decorator reads as untyped and

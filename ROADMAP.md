@@ -97,20 +97,21 @@ background; that is a platform limit, not a missing retry.
 
 ---
 
-## Phase 3 — Host tools `P1`
+## Phase 3 — Host tools `IN PROGRESS`
 
-- [ ] Host dashboard: live guest count, shot count, upload health
-- [ ] **Moderation**: one-tap hide, pending/approved states, hidden photos never
-      fan out to other guests
+- [x] Host dashboard: live guest count, shot count, upload health
+- [x] **Moderation**: one-tap hide (and unhide), hidden photos never fan out
 - [ ] Co-hosts (couple + planner) and a read-only photographer seat
-- [ ] Print-ready QR table cards as PDF (2 sizes, event name, short code)
-- [ ] Bulk **ZIP download of originals**
-- [ ] Extend film time, raise guest cap, adjust shot limit mid-event
-- [ ] Reveal scheduling + "develop now"
-- [ ] Guest can delete their own photo
+- [x] Print-ready QR table cards as PDF (table + signage sizes) plus a browser print page
+- [x] Bulk **ZIP download of originals** (hidden shots omitted, media worker)
+- [x] Extend film time, raise guest cap, adjust shot limit mid-event
+- [x] Reveal scheduling + "develop now"
+- [x] Guest can delete their own photo
 - [ ] Reveal notification (email/push) the morning after
 
 **Done when:** a host can kill a bad photo in one tap before 150 phones see it.
+Met: the host inbox shows photos *before* reveal, with signed URLs that the
+public gallery will not mint.
 
 ---
 

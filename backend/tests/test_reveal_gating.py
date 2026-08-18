@@ -99,9 +99,7 @@ async def test_hidden_photos_never_appear_after_reveal(client: AsyncClient, past
 
     assert len((await client.get(f"/v1/films/{code}/gallery")).json()["photos"]) == 2
 
-    hidden = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/hide", headers=auth(host_token)
-    )
+    hidden = await client.post(f"/v1/films/{code}/shots/{shot_id}/hide", headers=auth(host_token))
     assert hidden.status_code == 204
 
     photos = (await client.get(f"/v1/films/{code}/gallery")).json()["photos"]
@@ -109,9 +107,7 @@ async def test_hidden_photos_never_appear_after_reveal(client: AsyncClient, past
     assert all(photo["shot_id"] != shot_id for photo in photos)
 
 
-async def test_reserved_but_uncommitted_shots_stay_out_of_the_gallery(
-    client: AsyncClient, past
-):
+async def test_reserved_but_uncommitted_shots_stay_out_of_the_gallery(client: AsyncClient, past):
     """A reserved slot has no bytes yet and would render as a broken image."""
     closes = datetime.now(UTC) + timedelta(hours=1)
     code, _ = await make_film(client, closes_at=closes, reveal_at=past)

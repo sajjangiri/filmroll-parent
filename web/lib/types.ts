@@ -17,6 +17,7 @@ export type FilmPublic = {
   shot_limit: number;
   guest_cap: number;
   guest_count: number;
+  shot_count: number;
   join_url: string;
 };
 
@@ -59,4 +60,24 @@ export type GalleryResponse = {
   shot_count: number;
   /** Always empty until the film develops; the server mints no URLs before then. */
   photos: GalleryPhoto[];
+};
+
+export type ReviewPhoto = {
+  shot_id: string;
+  guest_name: string;
+  uploaded_at: string | null;
+  hidden: boolean;
+  url: string;
+};
+
+export type ReviewResponse = {
+  shot_count: number;
+  hidden_count: number;
+  photos: ReviewPhoto[];
+};
+
+export type ExportResponse = {
+  status: "idle" | "pending" | "ready" | "failed" | string;
+  shot_count: number;
+  download_url: string | null;
 };

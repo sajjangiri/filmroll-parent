@@ -59,9 +59,7 @@ class Film(Base):
     title: Mapped[str] = mapped_column(String(200))
     event_type: Mapped[str] = mapped_column(String(40), default="other")
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     # No new shots accepted after this moment.
     closes_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     # Scheduled develop time.
@@ -74,12 +72,8 @@ class Film(Base):
 
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    guests: Mapped[list[Guest]] = relationship(
-        back_populates="film", cascade="all, delete-orphan"
-    )
-    shots: Mapped[list[Shot]] = relationship(
-        back_populates="film", cascade="all, delete-orphan"
-    )
+    guests: Mapped[list[Guest]] = relationship(back_populates="film", cascade="all, delete-orphan")
+    shots: Mapped[list[Shot]] = relationship(back_populates="film", cascade="all, delete-orphan")
 
     __table_args__ = (
         CheckConstraint("shot_limit > 0", name="ck_films_shot_limit_positive"),
@@ -95,14 +89,10 @@ class Guest(Base):
         ForeignKey("films.id", ondelete="CASCADE"), index=True
     )
     display_name: Mapped[str] = mapped_column(String(80))
-    joined_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     film: Mapped[Film] = relationship(back_populates="guests")
-    shots: Mapped[list[Shot]] = relationship(
-        back_populates="guest", cascade="all, delete-orphan"
-    )
+    shots: Mapped[list[Shot]] = relationship(back_populates="guest", cascade="all, delete-orphan")
 
 
 class Shot(Base):
@@ -111,16 +101,10 @@ class Shot(Base):
     # Supplied by the client, never defaulted here. See module docstring.
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True)
 
-    film_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("films.id", ondelete="CASCADE")
-    )
-    guest_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("guests.id", ondelete="CASCADE")
-    )
+    film_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("films.id", ondelete="CASCADE"))
+    guest_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("guests.id", ondelete="CASCADE"))
 
-    state: Mapped[ShotState] = mapped_column(
-        shot_state_enum, default=ShotState.RESERVED
-    )
+    state: Mapped[ShotState] = mapped_column(shot_state_enum, default=ShotState.RESERVED)
     storage_key: Mapped[str] = mapped_column(String(300))
     content_type: Mapped[str] = mapped_column(String(60), default="image/jpeg")
 

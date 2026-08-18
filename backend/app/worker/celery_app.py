@@ -37,7 +37,7 @@ celery_app.conf.update(
         "app.worker.tasks.build_export_archive": {"queue": "media"},
     },
     task_annotations={
-        "app.worker.tasks.build_recap_video": {
+        "app.worker.tasks.build_export_archive": {
             "soft_time_limit": 600,
             "time_limit": 900,
         },

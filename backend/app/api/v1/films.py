@@ -10,18 +10,22 @@ from app.core.logging import get_logger
 from app.db.models import Film
 from app.schemas import (
     CommitResponse,
+    ExportResponse,
     FilmCreate,
     FilmCreated,
     FilmPublic,
+    FilmUpdate,
     GalleryPhoto,
     GalleryResponse,
     JoinRequest,
     JoinResponse,
     ReserveRequest,
     ReserveResponse,
+    ReviewPhoto,
+    ReviewResponse,
 )
+from app.services import exports, printcards, qrcodes, ratelimit, storage, tokens
 from app.services import films as films_service
-from app.services import qrcodes, ratelimit, storage, tokens
 from app.services.dispatch import enqueue_after_commit
 
 router = APIRouter(prefix="/v1/films", tags=["films"])
@@ -55,6 +59,7 @@ async def _to_public(
         shot_limit=film.shot_limit,
         guest_cap=film.guest_cap,
         guest_count=await films_service.guest_count(session, film.id),
+        shot_count=len(await films_service.visible_shots(session, film.id)),
         join_url=qrcodes.join_url(film.code),
     )
 
@@ -99,9 +104,7 @@ async def join(
         limit=settings.rate_limit_join_per_hour,
         window_seconds=3600,
     ):
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS, "too many joins, slow down"
-        )
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many joins, slow down")
 
     try:
         guest = await films_service.join_film(session, view.film, payload.display_name)
@@ -110,9 +113,7 @@ async def join(
             status.HTTP_409_CONFLICT, "this film has reached its guest limit"
         ) from None
 
-    remaining = await films_service.shots_remaining(
-        session, film=view.film, guest_id=guest.id
-    )
+    remaining = await films_service.shots_remaining(session, film=view.film, guest_id=guest.id)
     return JoinResponse(
         guest_id=guest.id,
         guest_token=tokens.issue_guest_token(view.film.id, guest.id),
@@ -145,9 +146,7 @@ async def reserve_shot(
         limit=get_settings().rate_limit_reserve_per_minute,
         window_seconds=60,
     ):
-        raise HTTPException(
-            status.HTTP_429_TOO_MANY_REQUESTS, "too many uploads, slow down"
-        )
+        raise HTTPException(status.HTTP_429_TOO_MANY_REQUESTS, "too many uploads, slow down")
 
     try:
         key, already = await films_service.reserve_shot(
@@ -213,9 +212,7 @@ async def commit_shot(
     remaining = await films_service.shots_remaining(
         session, film=view.film, guest_id=principal.guest_id
     )
-    return CommitResponse(
-        shot_id=shot.id, state=str(shot.state.value), shots_remaining=remaining
-    )
+    return CommitResponse(shot_id=shot.id, state=str(shot.state.value), shots_remaining=remaining)
 
 
 @router.get("/{code}/qr.svg", response_class=Response)
@@ -279,3 +276,114 @@ async def hide_shot(
     shot_id: uuid.UUID, view: FilmDep, principal: HostPrincipal, session: DbSession
 ) -> None:
     await films_service.hide_shot(session, film=view.film, shot_id=shot_id)
+
+
+@router.post("/{code}/shots/{shot_id}/unhide", status_code=status.HTTP_204_NO_CONTENT)
+async def unhide_shot(
+    shot_id: uuid.UUID, view: FilmDep, principal: HostPrincipal, session: DbSession
+) -> None:
+    await films_service.unhide_shot(session, film=view.film, shot_id=shot_id)
+
+
+@router.delete("/{code}/shots/{shot_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def retract_shot(
+    shot_id: uuid.UUID, view: FilmDep, principal: GuestPrincipal, session: DbSession
+) -> None:
+    try:
+        await films_service.retract_shot(
+            session, film=view.film, guest_id=principal.guest_id, shot_id=shot_id
+        )
+    except films_service.ShotNotOwned:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "shot not found") from None
+
+
+@router.patch("/{code}", response_model=FilmPublic)
+async def update_film(
+    payload: FilmUpdate, view: FilmDep, principal: HostPrincipal, session: DbSession
+) -> FilmPublic:
+    try:
+        await films_service.update_film(
+            session,
+            view.film,
+            closes_at=payload.closes_at,
+            reveal_at=payload.reveal_at,
+            shot_limit=payload.shot_limit,
+            guest_cap=payload.guest_cap,
+        )
+    except films_service.CapBelowHeadcount as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+    except films_service.LimitBelowUse as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from None
+
+    refreshed = await films_service.load_by_id(session, view.film.id)
+    return await _to_public(
+        session,
+        refreshed.film,
+        is_developed=refreshed.is_developed,
+        is_closed=refreshed.is_closed,
+    )
+
+
+@router.get("/{code}/review", response_model=ReviewResponse)
+async def review(view: FilmDep, principal: HostPrincipal, session: DbSession) -> ReviewResponse:
+    """Host inbox. Photos are visible here before the film develops.
+
+    That is the whole point of moderation: a host must be able to hide a shot
+    before a hundred phones see it at reveal.
+    """
+    shots = await films_service.review_shots(session, view.film.id)
+    photos = [
+        ReviewPhoto(
+            shot_id=shot.id,
+            guest_name=shot.guest.display_name,
+            uploaded_at=shot.uploaded_at,
+            hidden=shot.hidden_at is not None,
+            url=await storage.presign_get(shot.storage_key),
+        )
+        for shot in shots
+    ]
+    hidden_count = sum(1 for photo in photos if photo.hidden)
+    return ReviewResponse(shot_count=len(photos), hidden_count=hidden_count, photos=photos)
+
+
+@router.get("/{code}/cards.pdf", response_class=Response)
+async def join_cards(view: FilmDep) -> Response:
+    """A4 PDF of table cards and larger signage. Public like the QR itself."""
+    pdf = printcards.join_cards_pdf(code=view.film.code, title=view.film.title)
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="filmroll-{view.film.code}-cards.pdf"',
+            "Cache-Control": "private, max-age=300",
+        },
+    )
+
+
+@router.post("/{code}/export", response_model=ExportResponse)
+async def start_export(
+    view: FilmDep, principal: HostPrincipal, session: DbSession
+) -> ExportResponse:
+    """Build a ZIP of clean originals. Runs on the media worker.
+
+    Hidden shots are omitted. The zip never passes through this process.
+    """
+    shots = await films_service.visible_shots(session, view.film.id)
+    await exports.mark_pending(str(view.film.id))
+    enqueue_after_commit(session, "app.worker.tasks.build_export_archive", str(view.film.id))
+    return ExportResponse(status=exports.PENDING, shot_count=len(shots))
+
+
+@router.get("/{code}/export", response_model=ExportResponse)
+async def get_export(view: FilmDep, principal: HostPrincipal, session: DbSession) -> ExportResponse:
+    film_id = str(view.film.id)
+    state = await exports.status(film_id)
+    shots = await films_service.visible_shots(session, view.film.id)
+    url = None
+    if state == exports.READY:
+        key = storage.export_key(film_id, "originals")
+        if await storage.object_exists(key):
+            url = await storage.presign_get(key)
+        else:
+            state = "idle"
+    return ExportResponse(status=state, shot_count=len(shots), download_url=url)

@@ -34,3 +34,11 @@ def join_qr_svg(code: str, scale: int = 8) -> bytes:
     buffer = io.BytesIO()
     qr.save(buffer, kind="svg", scale=scale, border=2, dark="#000000", light="#ffffff")
     return buffer.getvalue()
+
+
+def join_qr_png(code: str, scale: int = 8) -> bytes:
+    """Raster QR for embedding in a PDF. SVG stays the on-screen format."""
+    qr = segno.make(join_url(code), error="h")
+    buffer = io.BytesIO()
+    qr.save(buffer, kind="png", scale=scale, border=2, dark="#000000", light="#ffffff")
+    return buffer.getvalue()

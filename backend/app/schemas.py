@@ -40,9 +40,23 @@ class FilmPublic(BaseModel):
     shot_limit: int
     guest_cap: int
     guest_count: int
+    shot_count: int
     # Built server-side so the QR code, the host screen and a printed card all
     # encode the same destination.
     join_url: str
+
+
+class FilmUpdate(BaseModel):
+    """Host adjustments while an event is running.
+
+    Caps can be raised freely. They can be lowered only as far as the current
+    headcount or the fullest roll, otherwise a paying guest would be stranded.
+    """
+
+    closes_at: datetime | None = None
+    reveal_at: datetime | None = None
+    shot_limit: int | None = Field(default=None, ge=1, le=500)
+    guest_cap: int | None = Field(default=None, ge=1, le=1000)
 
 
 class FilmCreated(BaseModel):
@@ -93,3 +107,25 @@ class GalleryResponse(BaseModel):
     is_developed: bool
     shot_count: int
     photos: list[GalleryPhoto]
+
+
+class ReviewPhoto(BaseModel):
+    shot_id: uuid.UUID
+    guest_name: str
+    uploaded_at: datetime | None
+    hidden: bool
+    url: str
+
+
+class ReviewResponse(BaseModel):
+    """Host-only. Signed URLs exist here even before the film develops."""
+
+    shot_count: int
+    hidden_count: int
+    photos: list[ReviewPhoto]
+
+
+class ExportResponse(BaseModel):
+    status: str
+    shot_count: int = 0
+    download_url: str | None = None

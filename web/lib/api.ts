@@ -8,11 +8,13 @@
 
 import type {
   CommitResponse,
+  ExportResponse,
   FilmCreated,
   FilmPublic,
   GalleryResponse,
   JoinResponse,
   ReserveResponse,
+  ReviewResponse,
 } from "@/lib/types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -133,6 +135,53 @@ export function hideShot(
     method: "POST",
     token: hostToken,
   });
+}
+
+export function unhideShot(
+  code: string,
+  shotId: string,
+  hostToken: string,
+): Promise<void> {
+  return request<void>(`/v1/films/${code}/shots/${shotId}/unhide`, {
+    method: "POST",
+    token: hostToken,
+  });
+}
+
+export function getReview(code: string, hostToken: string): Promise<ReviewResponse> {
+  return request<ReviewResponse>(`/v1/films/${code}/review`, { token: hostToken });
+}
+
+export function updateFilm(
+  code: string,
+  hostToken: string,
+  patch: {
+    closes_at?: string;
+    reveal_at?: string;
+    shot_limit?: number;
+    guest_cap?: number;
+  },
+): Promise<FilmPublic> {
+  return request<FilmPublic>(`/v1/films/${code}`, {
+    method: "PATCH",
+    token: hostToken,
+    body: JSON.stringify(patch),
+  });
+}
+
+export function startExport(code: string, hostToken: string): Promise<ExportResponse> {
+  return request<ExportResponse>(`/v1/films/${code}/export`, {
+    method: "POST",
+    token: hostToken,
+  });
+}
+
+export function getExport(code: string, hostToken: string): Promise<ExportResponse> {
+  return request<ExportResponse>(`/v1/films/${code}/export`, { token: hostToken });
+}
+
+export function cardsPdfUrl(code: string): string {
+  return `${API_URL}/v1/films/${code}/cards.pdf`;
 }
 
 // --------------------------------------------------------------- capture flow

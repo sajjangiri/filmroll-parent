@@ -7,7 +7,7 @@ export default async function HostPage({
 }) {
   const { code } = await params;
   return (
-    <main className="mx-auto flex min-h-full max-w-lg flex-col p-6">
+    <main className="mx-auto flex min-h-full max-w-3xl flex-col p-6">
       <HostDashboard code={code} />
     </main>
   );

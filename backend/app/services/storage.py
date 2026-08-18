@@ -156,9 +156,7 @@ async def delete_prefix(prefix: str) -> int:
 
 async def delete_object(key: str) -> None:
     settings = get_settings()
-    await asyncio.to_thread(
-        _internal_client().delete_object, Bucket=settings.s3_bucket, Key=key
-    )
+    await asyncio.to_thread(_internal_client().delete_object, Bucket=settings.s3_bucket, Key=key)
 
 
 # ------------------------------------------------------- synchronous (workers)
@@ -176,6 +174,16 @@ def upload_bytes(key: str, data: bytes, content_type: str) -> None:
     settings = get_settings()
     _internal_client().put_object(
         Bucket=settings.s3_bucket, Key=key, Body=data, ContentType=content_type
+    )
+
+
+def upload_file(key: str, path: str, content_type: str) -> None:
+    settings = get_settings()
+    _internal_client().upload_file(
+        path,
+        settings.s3_bucket,
+        key,
+        ExtraArgs={"ContentType": content_type},
     )
 
 

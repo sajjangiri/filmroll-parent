@@ -64,6 +64,18 @@ class ShotExpired(FilmError):
     pass
 
 
+class CapBelowHeadcount(FilmError):
+    pass
+
+
+class LimitBelowUse(FilmError):
+    pass
+
+
+class ShotNotOwned(FilmError):
+    pass
+
+
 def generate_code() -> str:
     return "".join(secrets.choice(CODE_ALPHABET) for _ in range(CODE_LENGTH))
 
@@ -237,9 +249,7 @@ async def commit_shot(
 ) -> Shot:
     """Mark an uploaded shot as live once its bytes are confirmed present."""
     shot = await session.scalar(
-        select(Shot).where(
-            Shot.id == shot_id, Shot.guest_id == guest_id, Shot.film_id == film.id
-        )
+        select(Shot).where(Shot.id == shot_id, Shot.guest_id == guest_id, Shot.film_id == film.id)
     )
     if shot is None:
         raise ShotNotFound(str(shot_id))
@@ -298,9 +308,7 @@ async def _release_reservation(session: AsyncSession, shot_id: uuid.UUID) -> Non
     flush would be undone and the guest would silently lose a shot. Nothing else
     has been written on this path, so there is no unrelated work to carry along.
     """
-    await session.execute(
-        update(Shot).where(Shot.id == shot_id).values(state=ShotState.EXPIRED)
-    )
+    await session.execute(update(Shot).where(Shot.id == shot_id).values(state=ShotState.EXPIRED))
     await session.commit()
 
 
@@ -319,6 +327,65 @@ async def hide_shot(session: AsyncSession, *, film: Film, shot_id: uuid.UUID) ->
         .where(Shot.id == shot_id, Shot.film_id == film.id, Shot.hidden_at.is_(None))
         .values(hidden_at=func.now())
     )
+
+
+async def unhide_shot(session: AsyncSession, *, film: Film, shot_id: uuid.UUID) -> None:
+    await session.execute(
+        update(Shot)
+        .where(Shot.id == shot_id, Shot.film_id == film.id, Shot.hidden_at.isnot(None))
+        .values(hidden_at=None)
+    )
+
+
+async def retract_shot(
+    session: AsyncSession, *, film: Film, guest_id: uuid.UUID, shot_id: uuid.UUID
+) -> None:
+    """A guest removing their own photo. Same outcome as a host hide."""
+    shot = await session.scalar(
+        select(Shot).where(Shot.id == shot_id, Shot.film_id == film.id, Shot.guest_id == guest_id)
+    )
+    if shot is None:
+        raise ShotNotOwned(str(shot_id))
+    if shot.hidden_at is None:
+        await session.execute(update(Shot).where(Shot.id == shot_id).values(hidden_at=func.now()))
+
+
+async def update_film(
+    session: AsyncSession,
+    film: Film,
+    *,
+    closes_at: datetime | None = None,
+    reveal_at: datetime | None = None,
+    shot_limit: int | None = None,
+    guest_cap: int | None = None,
+) -> Film:
+    if guest_cap is not None:
+        current = await guest_count(session, film.id)
+        if guest_cap < current:
+            raise CapBelowHeadcount(f"{guest_cap} is below {current} guests")
+        film.guest_cap = guest_cap
+
+    if shot_limit is not None:
+        fullest = await session.scalar(
+            select(func.count())
+            .select_from(Shot)
+            .where(Shot.film_id == film.id, Shot.state != ShotState.EXPIRED)
+            .group_by(Shot.guest_id)
+            .order_by(func.count().desc())
+            .limit(1)
+        )
+        if shot_limit < (fullest or 0):
+            raise LimitBelowUse(f"{shot_limit} is below a guest's {fullest} shots")
+        film.shot_limit = shot_limit
+
+    if closes_at is not None:
+        film.closes_at = closes_at
+    if reveal_at is not None:
+        film.reveal_at = reveal_at
+
+    await session.flush()
+    await session.refresh(film)
+    return film
 
 
 # --------------------------------------------------------------------- queries
@@ -345,9 +412,22 @@ async def visible_shots(session: AsyncSession, film_id: uuid.UUID) -> list[Shot]
     return list(result.scalars().all())
 
 
-async def shots_remaining(
-    session: AsyncSession, *, film: Film, guest_id: uuid.UUID
-) -> int:
+async def review_shots(session: AsyncSession, film_id: uuid.UUID) -> list[Shot]:
+    """Every uploaded shot, including hidden ones. Host review only.
+
+    The gallery uses visible_shots. This is the one query that is allowed to
+    see a hidden photo, because the host cannot moderate what they cannot see.
+    """
+    result = await session.execute(
+        select(Shot)
+        .where(Shot.film_id == film_id, Shot.state == ShotState.UPLOADED)
+        .options(selectinload(Shot.guest))
+        .order_by(Shot.uploaded_at)
+    )
+    return list(result.scalars().all())
+
+
+async def shots_remaining(session: AsyncSession, *, film: Film, guest_id: uuid.UUID) -> int:
     used = await session.scalar(
         select(func.count())
         .select_from(Shot)

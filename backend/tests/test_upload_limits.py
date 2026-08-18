@@ -47,9 +47,7 @@ async def test_oversized_upload_is_rejected_and_the_slot_returned(
     oversized = b"\xff\xd8\xff" + b"\x00" * (get_settings().max_upload_bytes + 1024)
     await _put(url, oversized, "image/jpeg")
 
-    committed = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token)
-    )
+    committed = await client.post(f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token))
     assert committed.status_code == 413, committed.text
 
     # The slot goes back, otherwise one fat upload would cost a guest a photo.
@@ -96,9 +94,7 @@ async def test_non_image_upload_is_rejected(client: AsyncClient, future: datetim
     assert reserved.status_code == 200
     await _put(reserved.json()["upload_url"], b"not a photo", "video/mp4")
 
-    committed = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token)
-    )
+    committed = await client.post(f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token))
     assert committed.status_code == 415, committed.text
 
 
@@ -116,9 +112,7 @@ async def test_expired_shot_cannot_be_committed_later(
 
     shot_id, url = await _reserve(client, code, token)
     await _put(url, b"\xff\xd8\xff" + b"\x00" * (get_settings().max_upload_bytes + 1), "image/jpeg")
-    rejected = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token)
-    )
+    rejected = await client.post(f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token))
     assert rejected.status_code == 413
 
     # Re-upload something perfectly valid to the same key and try again.
@@ -129,9 +123,7 @@ async def test_expired_shot_cannot_be_committed_later(
     )
     await _put(again.json()["upload_url"], TINY_JPEG, "image/jpeg")
 
-    resurrected = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token)
-    )
+    resurrected = await client.post(f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token))
     assert resurrected.status_code == 409, "an expired shot must not come back to life"
 
     gallery = await client.get(f"/v1/films/{code}/gallery")
@@ -146,7 +138,5 @@ async def test_a_normal_photo_still_commits(client: AsyncClient, future: datetim
     shot_id, url = await _reserve(client, code, token)
     await _put(url, TINY_JPEG, "image/jpeg")
 
-    committed = await client.post(
-        f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token)
-    )
+    committed = await client.post(f"/v1/films/{code}/shots/{shot_id}/commit", headers=auth(token))
     assert committed.status_code == 200, committed.text
