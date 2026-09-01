@@ -1,4 +1,4 @@
-import { HostDashboard } from "@/components/HostDashboard";
+import { HostDashboard } from "@/components/host/HostDashboard";
 
 export default async function HostPage({
   params,

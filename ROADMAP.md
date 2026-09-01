@@ -144,6 +144,7 @@ tier, the cap still rises, and no money moves. Production ignores the fake flag.
 Full spec in `docs/app-clip.md`. Summary of the order:
 
 - [x] Expo guest app: join by code, native camera, gallery after develop
+- [x] Expo guest offline upload queue (JPEG on disk, drain when the app is open)
 - [ ] Host management in the native app (today that stays on the web)
 - [ ] StoreKit 2 IAP in the **full app only** (App Clips cannot do IAP)
 - [ ] **Publish the full app to the App Store** — hard prerequisite

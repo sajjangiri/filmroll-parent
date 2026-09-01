@@ -1,0 +1,15 @@
+---
+description: Filmroll plan memory and load-bearing invariants. Always apply in this monorepo.
+alwaysApply: true
+---
+
+# Filmroll
+
+Follow the existing plan in `ROADMAP.md`. Do not invent a new product sequence.
+
+- Continue from `.cursor/skills/filmroll-continue/SKILL.md`
+- `web/` → `web/.cursor/skills/filmroll-web/SKILL.md`
+- `mobile/` → `mobile/.cursor/skills/filmroll-mobile/SKILL.md`
+- `backend/` → `backend/.cursor/skills/filmroll-backend/SKILL.md`
+
+App Clip is not next. Hosts create/pay/moderate on the web. Photo bytes never pass through Next.js or FastAPI.

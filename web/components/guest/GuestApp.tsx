@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Camera } from "@/components/Camera";
-import { InstallHint } from "@/components/InstallHint";
+import { Camera } from "@/components/guest/Camera";
+import { InstallHint } from "@/components/guest/InstallHint";
 import {
   ApiError,
   clearGuestToken,

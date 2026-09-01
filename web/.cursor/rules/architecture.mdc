@@ -1,0 +1,13 @@
+---
+description: Filmroll web architecture — guest vs host folders, upload contract, Next 16.
+globs: "**/*.{ts,tsx,js,mjs}"
+alwaysApply: false
+---
+
+# Web
+
+Read `.cursor/skills/filmroll-web/SKILL.md` before changing this tree.
+
+- Routes stay in `app/`. Guest UI in `components/guest/`. Host UI in `components/host/`.
+- `params` is a Promise. Photo bytes never go through Next.js.
+- Types stay snake_case to match FastAPI. Continue the existing `ROADMAP.md` plan; see `.cursor/skills/filmroll-web/continue.md`.

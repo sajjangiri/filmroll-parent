@@ -1,0 +1,29 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+coverage.xml
+coverage/
+
+# env files — commit .env.example only
+.env
+.env.*
+!.env.example
+
+# Celery beat schedule written into the source tree when run locally
+celerybeat-schedule*
+
+# OS / secrets
+.DS_Store
+*.pem
+*.key
+
+# local agent scratch (project skills/rules are committed)
+.claude/

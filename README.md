@@ -29,10 +29,12 @@ python3 scripts/smoke.py
 ## Architecture
 
 ```
-web/       Next.js guest camera + host tools, no download required
-mobile/    Expo guest camera (iOS/Android). Hosts stay on the web.
-backend/   FastAPI, Celery workers, Alembic migrations
+web/       Next.js guest camera + host tools (`components/guest|host|pwa`)
+mobile/    Expo guest camera (`src/screens`, `src/api`). Hosts stay on the web.
+backend/   FastAPI (`app/api`, `app/services`, `app/worker`)
 ```
+
+Each of those folders is its own git remote when you work in it alone. Skills that keep the architecture and the existing roadmap from drifting live in `.cursor/skills/` (parent) and in `web|mobile|backend/.cursor/skills/`. Do not start a new product plan; continue `ROADMAP.md`.
 
 The browser talks to FastAPI directly and uploads to storage with a presigned
 URL. Next.js serves the interface and nothing else, so no photo or credential

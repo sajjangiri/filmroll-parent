@@ -7,3 +7,14 @@ This version has breaking changes — APIs, conventions, and file structure may 
 This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
 
 <!-- END:nextjs-agent-rules -->
+
+# Filmroll monorepo
+
+Do not invent a new product plan. Canonical roadmap: `ROADMAP.md`. Feature matrix: `FEATURES.md`. App Clip spec: `docs/app-clip.md`.
+
+Read before changing code:
+
+- `.cursor/skills/filmroll-continue/SKILL.md` — where we are and what comes next
+- `web/.cursor/skills/filmroll-web/SKILL.md` when touching `web/`
+- `mobile/.cursor/skills/filmroll-mobile/SKILL.md` when touching `mobile/`
+- `backend/.cursor/skills/filmroll-backend/SKILL.md` when touching `backend/`

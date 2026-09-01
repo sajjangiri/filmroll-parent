@@ -36,6 +36,12 @@ coverage/
 .env.*
 !.env.example
 
+# Nested application git directories. Source stays in this tree; do not ingest
+# another repo's objects, hooks, or index.
+web/.git/
+mobile/.git/
+backend/.git/
+
 # local prototype data, superseded by Postgres + MinIO
 web/data/
 web/public/uploads/

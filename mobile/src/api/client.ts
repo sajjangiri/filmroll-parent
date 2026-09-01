@@ -151,6 +151,12 @@ export async function captureShot(
     : new Error("Could not upload this photo");
 }
 
+/** Errors that should stay in the queue and retry. Anything else is terminal. */
+export function isRetryableUploadError(error: unknown): boolean {
+  if (!(error instanceof ApiError)) return true;
+  return error.status === 429 || error.status >= 500;
+}
+
 /** Pull a 6-character film code out of a universal link or custom scheme. */
 export function filmCodeFromUrl(raw: string): string | null {
   const match = raw.match(/\/f\/([A-Za-z0-9]{4,12})(?:[/?#]|$)/i);

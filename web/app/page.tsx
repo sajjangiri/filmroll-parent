@@ -1,4 +1,4 @@
-import { CreateFilmForm } from "@/components/CreateFilmForm";
+import { CreateFilmForm } from "@/components/host/CreateFilmForm";
 
 export default function Home() {
   return (

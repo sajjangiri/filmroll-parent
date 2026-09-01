@@ -1,4 +1,4 @@
-import { PrintCards } from "@/components/PrintCards";
+import { PrintCards } from "@/components/host/PrintCards";
 import { getFilm } from "@/lib/api";
 
 export default async function PrintPage({

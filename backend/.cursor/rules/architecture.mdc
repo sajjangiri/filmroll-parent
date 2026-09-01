@@ -1,0 +1,13 @@
+---
+description: Filmroll FastAPI invariants — presigned uploads, SQL reveal, FOR UPDATE caps, after_commit Celery.
+globs: "**/*.py"
+alwaysApply: false
+---
+
+# Backend
+
+Read `.cursor/skills/filmroll-backend/SKILL.md` before changing this tree.
+
+- Domain in `app/services/`. HTTP in `app/api/`. Tasks after commit.
+- Reveal is SQL. Caps lock a row. Shot ids come from the client.
+- Continue the existing plan in `.cursor/skills/filmroll-backend/continue.md`.

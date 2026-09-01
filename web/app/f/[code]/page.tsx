@@ -1,4 +1,4 @@
-import { GuestApp } from "@/components/GuestApp";
+import { GuestApp } from "@/components/guest/GuestApp";
 
 export default async function FilmPage({
   params,

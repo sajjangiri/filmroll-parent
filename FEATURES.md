@@ -52,9 +52,9 @@ Legend:
 | Native camera capture | done | 5 | P1 | ios |
 | Server-enforced shot limit | done | 0 | P0 | api |
 | Shot counter ("8 left") | done | 0 | P0 | web, ios, clip |
-| **Offline capture + upload queue** | done | 2 | P0 | web |
-| Retry with backoff, resumable upload | done | 2 | P0 | web |
-| Visible upload queue state | done | 2 | P0 | web |
+| **Offline capture + upload queue** | done | 2 | P0 | web, ios |
+| Retry with backoff, resumable upload | done | 2 | P0 | web, ios |
+| Visible upload queue state | done | 2 | P0 | web, ios |
 | Front / back camera switch | done | 2 | P0 | web, ios, clip |
 | Flash / torch | todo | 2 | P1 | web, ios, clip |
 | Live filter preview (WebGL / Core Image) | todo | 2 | P1 | web, ios |

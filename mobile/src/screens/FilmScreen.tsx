@@ -18,9 +18,10 @@ import {
   joinFilm,
   loadGuestToken,
   saveGuestToken,
-} from "./api";
+} from "../api/client";
 import { CameraScreen } from "./CameraScreen";
-import type { FilmPublic, GalleryPhoto } from "./types";
+import type { FilmPublic, GalleryPhoto } from "../api/types";
+import { drainQueue } from "../queue/upload-queue";
 
 export function FilmScreen({
   code,
@@ -58,6 +59,11 @@ export function FilmScreen({
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  useEffect(() => {
+    if (!token) return;
+    void drainQueue(code);
+  }, [code, token]);
 
   async function onJoin() {
     const trimmed = name.trim();

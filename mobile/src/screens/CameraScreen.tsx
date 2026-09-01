@@ -12,8 +12,8 @@ import {
   useCameraPermissions,
 } from "expo-camera";
 
-import { ApiError, captureShot } from "./api";
-import type { FilmPublic } from "./types";
+import { useUploadQueue } from "../queue/use-upload-queue";
+import type { FilmPublic } from "../api/types";
 
 type Props = {
   code: string;
@@ -37,12 +37,25 @@ export function CameraScreen({
   const [facing, setFacing] = useState<CameraType>("back");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [closed, setClosed] = useState(false);
+
+  const { snapshot, enqueue, waiting } = useUploadQueue(code, {
+    token,
+    onRemainingChange,
+    onUnauthorized,
+    onClosed: () => {
+      setClosed(true);
+      setError("This film has closed.");
+    },
+  });
 
   const unlimited = film.unlimited_shots;
-  const left = unlimited ? 9999 : Math.max(remaining ?? film.shot_limit, 0);
+  const left = unlimited
+    ? 9999
+    : Math.max((remaining ?? film.shot_limit) - waiting, 0);
 
   const shoot = useCallback(async () => {
-    if (!cameraRef.current || busy || left <= 0) return;
+    if (!cameraRef.current || busy || left <= 0 || closed) return;
     setBusy(true);
     setError("");
     try {
@@ -51,22 +64,13 @@ export function CameraScreen({
         skipProcessing: true,
       });
       if (!photo?.uri) throw new Error("Could not capture");
-      const committed = await captureShot(code, token, photo.uri);
-      onRemainingChange(committed.shots_remaining);
-    } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
-        onUnauthorized();
-        return;
-      }
-      if (err instanceof ApiError && err.status === 410) {
-        setError("This film has closed.");
-        return;
-      }
-      setError("That shot did not upload. Try again.");
+      await enqueue(photo.uri);
+    } catch {
+      setError("That shot did not save on this device. Try again.");
     } finally {
       setBusy(false);
     }
-  }, [busy, code, left, onRemainingChange, onUnauthorized, token]);
+  }, [busy, closed, enqueue, left]);
 
   if (!permission) {
     return (
@@ -104,11 +108,23 @@ export function CameraScreen({
           <Text style={styles.flipLabel}>Flip</Text>
         </Pressable>
       </View>
+      {waiting > 0 ? (
+        <Text style={styles.copy}>
+          {snapshot.uploading > 0
+            ? `Uploading… ${waiting} waiting`
+            : `${waiting} ${waiting === 1 ? "photo" : "photos"} saved on this phone`}
+        </Text>
+      ) : null}
+      {snapshot.failed > 0 ? (
+        <Text style={styles.error}>
+          {snapshot.failed} {snapshot.failed === 1 ? "shot" : "shots"} could not be uploaded.
+        </Text>
+      ) : null}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable
-        style={[styles.shutter, (busy || left <= 0) && styles.disabled]}
+        style={[styles.shutter, (busy || left <= 0 || closed) && styles.disabled]}
         onPress={() => void shoot()}
-        disabled={busy || left <= 0}
+        disabled={busy || left <= 0 || closed}
       />
       {left <= 0 ? (
         <Text style={styles.copy}>This camera is empty. Photos unlock when the film develops.</Text>
