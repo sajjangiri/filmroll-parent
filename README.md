@@ -6,25 +6,90 @@ develops at a time the host chooses.
 
 ## Quick start
 
-Requires Docker.
+### Prerequisites
+
+- Docker Desktop (or Docker Engine + Compose v2)
+- Node.js 22+ (for web and mobile)
+- Ports free: **8000**, **5432**, **6379**, **9000**, **9001**, **8025**, **3000** (web dev)
+
+### 1. Backend (Docker)
+
+From this repo root:
 
 ```bash
-make up        # builds and starts everything, waits for health
-make migrate   # applies database migrations
-make test      # runs the suite
+cp .env.example .env    # first time only
+make up                 # builds and starts everything, waits for health
+make migrate            # applies database migrations
 ```
 
-Then:
+| URL | Purpose |
+|-----|---------|
+| http://localhost:8000/docs | API + interactive docs |
+| http://localhost:9001 | MinIO console (`filmroll` / `filmroll-dev-secret`) |
+| http://localhost:8025 | Mailpit — magic links and host email |
+| `make help` | All make targets |
 
-- API and interactive docs: http://localhost:8000/docs
-- MinIO console: http://localhost:9001 (`filmroll` / `filmroll-dev-secret`)
-- `make help` lists every target
-
-To check the whole loop against a running stack:
+Smoke test the full loop:
 
 ```bash
 python3 scripts/smoke.py
 ```
+
+**Published ports (local):** API 8000 · Postgres 5432 · Redis 6379 · MinIO 9000/9001 · Mailpit 1025/8025
+
+More detail: [backend/README.md](backend/README.md)
+
+### 2. Web (host + guest PWA)
+
+Requires the backend from step 1.
+
+```bash
+cd web
+cp .env.example .env.local
+npm install
+npm run dev
+```
+
+Open http://localhost:3000 — create a film, open `/f/{code}` as a guest, moderate at `/f/{code}/host`.
+
+More detail: [web/README.md](web/README.md)
+
+### 3. Mobile (Expo guest camera)
+
+Requires the backend from step 1. Hosts still use the web.
+
+```bash
+cd mobile
+cp .env.example .env
+npm install
+npm start
+```
+
+Press `i` for iOS Simulator, or scan the QR with **Expo Go** on a physical phone.
+
+More detail: [mobile/README.md](mobile/README.md)
+
+### Physical phone (web + Expo)
+
+Phone and laptop on the **same wifi**. Find your address:
+
+```bash
+ipconfig getifaddr en0    # e.g. 192.168.1.42
+```
+
+Update **three** config files (replace the example IP):
+
+| File | Keys |
+|------|------|
+| `.env` (root) | `S3_PUBLIC_ENDPOINT_URL=http://192.168.1.42:9000`, `PUBLIC_WEB_URL=http://192.168.1.42:3000`, add `http://192.168.1.42:3000` to `CORS_ORIGINS` |
+| `web/.env.local` | `NEXT_PUBLIC_API_URL=http://192.168.1.42:8000` |
+| `mobile/.env` | `EXPO_PUBLIC_API_URL=http://192.168.1.42:8000` |
+
+Then `make up` from the root (reload API/workers), restart `npm run dev` in `web/`, and `npx expo start -c` in `mobile/`.
+
+Presigned upload URLs are signed against `S3_PUBLIC_ENDPOINT_URL`. If it still
+says `localhost`, join succeeds but uploads fail — the phone PUTs to itself.
+Full walkthrough and troubleshooting: [mobile/README.md](mobile/README.md).
 
 ## Architecture
 
@@ -34,36 +99,26 @@ mobile/    Expo guest camera (`src/screens`, `src/api`). Hosts stay on the web.
 backend/   FastAPI (`app/api`, `app/services`, `app/worker`)
 ```
 
-Each of those folders is its own git remote when you work in it alone. Skills that keep the architecture and the existing roadmap from drifting live in `.cursor/skills/` (parent) and in `web|mobile|backend/.cursor/skills/`. Do not start a new product plan; continue `ROADMAP.md`.
+Each of those folders is its own git remote when you work in it alone. Each has
+its own README with run instructions. Skills that keep the architecture and the
+existing roadmap from drifting live in `.cursor/skills/` (parent) and in
+`web|mobile|backend/.cursor/skills/`. Do not start a new product plan; continue
+`ROADMAP.md`.
 
 The browser talks to FastAPI directly and uploads to storage with a presigned
 URL. Next.js serves the interface and nothing else, so no photo or credential
 passes through it.
 
-```bash
-cd web && cp .env.example .env.local && npm install && npm run dev
-```
-
-`NEXT_PUBLIC_API_URL` must be a host the *phone* can resolve. Testing on a real
-device means using the machine's LAN address and adding that same origin to
-`CORS_ORIGINS` in the backend `.env`.
-
-The native guest camera lives in `mobile/`. Hosts still create, pay, and
-moderate on the web — that is the 30% App Store tax decision.
-
-```bash
-cd mobile && cp .env.example .env && npm start
-```
-
-On a physical phone set `EXPO_PUBLIC_API_URL` to the machine's LAN address.
-The App Clip is not this app: it cannot ship until a full iOS binary is on the
-App Store. `GET /.well-known/apple-app-site-association` is already served so
-the domain file is not the thing we scramble for later.
-
 The guest camera is an installable PWA. Tapping the shutter writes the JPEG to
 IndexedDB first; a drain loop uploads when the network returns. Putting the
 phone in airplane mode, shooting, then turning wifi back on is the intended
 path, not a failure case.
+
+The Expo app uses the same upload contract with a disk-backed queue on native.
+
+The App Clip is not this stack: it cannot ship until a full iOS binary is on the
+App Store. `GET /.well-known/apple-app-site-association` is already served so
+the domain file is not the thing we scramble for later.
 
 Hosts moderate from `/f/{code}/host`. That inbox shows photos *before* the
 gallery does, which is what makes one-tap hide useful. Table cards are
