@@ -45,6 +45,11 @@ Do not put API routes in Next that proxy photo bytes. The browser talks to FastA
 - New guest UI goes in `components/guest/`. New host UI in `components/host/`.
 - PWA: `app/manifest.ts` + `public/sw.js`. Do not cache API JSON (client already `cache: "no-store"`).
 
+## Deliberate choices that look like bugs
+
+- **`public/sw.js` has no fetch handler.** Next payloads are versioned per build, so caching them would serve a stale app after a deploy. Capture does not need the worker: photos land in IndexedDB from the page and the drain loop runs whenever this origin is open.
+- **Turbopack root is pinned one level up** (`next.config.ts`). A stray lockfile in the parent makes Turbopack infer the wrong workspace root, which changes how files resolve. Do not "correct" it to this directory.
+
 ## Do not
 
 - Start an App Clip or Smart App Banner without a real App Store id.
