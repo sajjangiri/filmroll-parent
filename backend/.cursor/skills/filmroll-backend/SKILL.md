@@ -38,6 +38,10 @@ Routers stay thin. Domain rules live in `app/services/`. New tables go through A
 9. **Charge for capacity, not shutter presses.** Fake Checkout locally (`BILLING_FAKE`); ignored in production.
 10. **Host email is never on `FilmPublic`.** Recover always 204 (no enumeration).
 11. **AASA** is JSON, no redirect, placeholder Team ID until App Store Connect.
+12. **An `EXPIRED` shot id is spent.** Committing one would put the photo in the gallery while the replacement slot is still outstanding, letting a guest shoot past the limit one rejected upload at a time. A retry must reserve a new id.
+13. **`_release_reservation` commits itself.** Callers raise immediately after and the session dependency rolls back on exception, so a plain flush would silently cost the guest a shot.
+14. **Tokens are scoped to one film.** `deps.py` compares `principal.film_id` to the loaded film; without it a guest at one event could act inside another.
+15. **The rate limiter fails open.** Redis is not the source of truth, and a limiter outage that blocked every guest at a wedding is worse than the burst it prevents.
 
 ## Tests
 
