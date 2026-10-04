@@ -72,7 +72,7 @@ each other. Met, except durable host auth which moves to Phase 3 with co-hosts.
 
 ---
 
-## Phase 2 — Guest experience, PWA `IN PROGRESS`
+## Phase 2 — Guest experience, PWA `DONE`
 
 This is the differentiator. Venue Wi-Fi is the enemy.
 
@@ -81,14 +81,13 @@ This is the differentiator. Venue Wi-Fi is the enemy.
 - [x] Retry with exponential backoff when the connection returns (page must be open,
       or reopened — iOS will not run Background Sync)
 - [x] Visible queue state: "3 photos waiting to upload"
-- [ ] Resumable/chunked upload for large files on bad connections
-- [ ] Live filter preview via WebGL shader (look applied at capture *preview*, never
-      baked into the stored original)
+- [x] Resumable upload: fresh presigned URL on each PUT retry (same shot id; JPEGs skip S3 multipart)
+- [x] Live filter preview via WebGL shader (look on preview only; originals stay clean)
 - [x] Front/back camera switch
-- [ ] Flash/torch, zoom
+- [x] Flash/torch and zoom
 - [x] Shot counter that feels like film ("8 left")
-- [ ] i18n: EN, ES, FR minimum
-- [ ] Accessibility pass — the "grandpa test": join to first photo under 30 seconds
+- [x] i18n: EN, ES, FR minimum
+- [x] Accessibility pass — the "grandpa test": join to first photo under 30 seconds
 
 **Done when:** you can put the phone in airplane mode, take 8 photos, re-enable
 Wi-Fi, and all 8 arrive. The queue does this while the film page is open, and
@@ -101,31 +100,89 @@ background; that is a platform limit, not a missing retry.
 
 - [x] Host dashboard: live guest count, shot count, upload health
 - [x] **Moderation**: one-tap hide (and unhide), hidden photos never fan out
-- [ ] Co-hosts (couple + planner) and a read-only photographer seat
+- [x] Co-hosts (couple + planner) and a read-only photographer seat
 - [x] Print-ready QR table cards as PDF (table + signage sizes) plus a browser print page
 - [x] Bulk **ZIP download of originals** (hidden shots omitted, media worker)
 - [x] Extend film time, raise guest cap, adjust shot limit mid-event
 - [x] Reveal scheduling + "develop now"
+- [x] Instant reveal (live gallery from the first shot)
 - [x] Guest can delete their own photo
+- [x] Host can delete the whole film, with a grace period before erasure
+- [x] Optional join PIN, so a photographed QR card is not enough to get in
+- [x] Guests can report a photo to the host
+- [x] Private vs shared gallery (default shared; private guests only see their own shots)
 - [x] Reveal notification (email) the morning after
-- [ ] Reveal push / ephemeral clip notification
+- [x] Reveal push to guests who joined from the app
+- [ ] Ephemeral clip notification (Phase 5)
 
 **Done when:** a host can kill a bad photo in one tap before 150 phones see it.
 Met: the host inbox shows photos *before* reveal, with signed URLs that the
 public gallery will not mint.
 
+**Instant reveal** is a live gallery, not a second reveal mechanism. Creation
+stamps `reveal_at` to now so the existing SQL predicate
+(`revealed_at IS NOT NULL OR now() >= reveal_at`) is already true. Hide still
+works. The flag cannot be turned off later: guests cannot un-see a photo. A live
+film is skipped by the "your film has developed" email, which would otherwise
+land seconds after create.
+
+**Private vs shared** is who sees whom after develop, not a second reveal.
+Shared (the default) is one album. Private mints signed URLs only for the
+calling guest's own shots; the host inbox and ZIP still hold the whole roll.
+Unlike instant reveal this can be PATCHed later: going private does not un-see
+a URL that already expired, and going shared is a deliberate host action. A
+host token on `GET /gallery` must not unlock other people's photos — that is
+what the inbox is for.
+
+**Reporting** is a signal, never an action. A report never hides anything: at a
+party with a hundred guests, a handful of friends could otherwise agree to bury
+a photograph the couple wanted, and moderation belongs to whoever is hosting.
+What the count buys is the host's attention, which is the scarce resource when
+they are on the dance floor. Reports are guest-scoped and one-per-guest, and the
+host sees the count but never who raised it — a report must not start an
+argument between two people at the same wedding.
+
+**Reveal push** is for the guests holding a camera. The host already gets
+email; a second channel to the same inbox would not help them on the dance
+floor. Tokens live on the guest row, not an account, and instant films never
+send one — they are born developed. Expo Go on current SDKs often cannot mint
+a remote token; a development or App Store build is what actually delivers.
+The ephemeral 8h/24h clip notice stays Phase 5 with the clip itself.
+
+The **join PIN** is optional and exists for one threat: a QR card sits on a table
+all evening, and anyone who photographs it can otherwise walk into a private
+event. It is stored as an HMAC under `SECRET_KEY` rather than bcrypt — no work
+factor saves a six-digit secret, but a database dump alone cannot test guesses,
+and an attacker holding the app secret can forge guest tokens anyway. The online
+attacker is bounded by the existing 20-joins-per-hour limiter instead.
+
+Deleting a film is **invisible now, destroyed later**. `deleted_at` 404s the film
+for guests and co-hosts the moment the host confirms; the objects survive
+`DELETED_FILM_GRACE_DAYS` (30) because these are usually the only copies of the
+photographs that exist. An hourly sweep then erases the objects, shots, and
+guests, and stamps `purged_at`. The film row and its payments are deliberately
+kept — a receipt is tax paperwork for a service that was actually delivered, and
+hard-deleting the film would cascade it away.
+
+Access beyond the creator is a **seat**: a revocable row that a token points at,
+not an account. A co-host can moderate, develop, and resize the room; a
+photographer can read the inbox and pull the ZIP and nothing else. Neither sees
+the owner's receipts or can invite anyone. Authorisation re-reads the seat on
+every request, so "remove the planner" is immediate rather than a year-long wait
+for a JWT to expire.
+
 ---
 
-## Phase 4 — Money `IN PROGRESS`
+## Phase 4 — Money `DONE`
 
 Charge for **capacity and artifacts**, never per shutter press.
 
 - [x] Stripe Checkout on web for guest-cap tiers (free 5 → paid ladder)
 - [x] Entitlement model: cap enforced server-side, upgrade mid-event
 - [x] Add-ons: unlimited shots
-- [ ] Video pack add-on
+- [x] Video pack add-on ($19: 3 clips per guest, up to 15s, on top of the photo roll)
 - [x] Keep-forever add-on (12 months included otherwise; ZIP always free)
-- [ ] Receipts, refunds, VAT/tax handling
+- [x] Receipts, refunds, VAT/tax handling
 - [x] Storage policy that is honest: 12 months included, then paid keep-forever;
       host ZIP export always free
 - [x] Month-11 retention email
@@ -144,8 +201,9 @@ tier, the cap still rises, and no money moves. Production ignores the fake flag.
 Full spec in `docs/app-clip.md`. Summary of the order:
 
 - [x] Expo guest app: join by code, native camera, gallery after develop
+- [x] Expo host: create film, share code + QR (full dashboard still on web)
 - [x] Expo guest offline upload queue (JPEG on disk, drain when the app is open)
-- [ ] Host management in the native app (today that stays on the web)
+- [x] Host management in the native app (moderation, reveal, export, caps — Stripe upgrades stay on web until StoreKit)
 - [ ] StoreKit 2 IAP in the **full app only** (App Clips cannot do IAP)
 - [ ] **Publish the full app to the App Store** — hard prerequisite
 - [ ] App Clip target, budget **≤15 MB uncompressed** (QR invocation limit)
@@ -157,7 +215,7 @@ Full spec in `docs/app-clip.md`. Summary of the order:
 - [ ] Handoff clip → full app (App Group + "Get the full app" overlay)
 - [ ] Ephemeral notification permission (8h/24h) for the reveal
 - [ ] Optional: App Clip Codes (Apple's visual code) for premium printed cards
-- [ ] Smart App Banner on the web page so iOS users are offered the clip
+- [x] Smart App Banner on the web page (when `NEXT_PUBLIC_IOS_APP_STORE_ID` is set)
 
 **Done when:** scanning the printed QR on an iPhone opens the camera card without an
 App Store download, and the same QR on Android opens the PWA.
@@ -166,9 +224,19 @@ App Store download, and the same QR on Android opens the PWA.
 
 ## Phase 6 — Android + moat `P2`
 
-- [ ] Android host app (or keep host on web and skip this)
-- [ ] Guest video clips, 5–15s, hard-capped, transcoded async
-- [ ] Live slideshow URL for a venue screen / projector
+- [x] Android host app — the same Expo app (host + guest) runs on Android; App Links
+      via `/.well-known/assetlinks.json`. Play Store listing waits on the same
+      production URLs as the App Store build
+- [x] Guest video clips, up to 15s, hard-capped, transcoded async — separate
+      per-guest clip allowance, gated on the video pack; web (MediaRecorder) and
+      the Expo app (expo-camera + expo-video); microphone asked only on first record.
+      The media worker trims to 15s and re-encodes to H.264/AAC MP4 with metadata
+      stripped, plus a poster frame; a clip is never shown before that
+- [x] Live slideshow URL for a venue screen / projector — `/f/{code}/slideshow`,
+      public gallery only; newest unseen shots first, then a cycle; clips play
+      muted and hold the wall until they end; photos use the 1280 px derivative.
+      Host dashboard and the mobile host Settings tab open the URL. A private
+      gallery has no wall (the join QR stays up so guests can still shoot).
 - [ ] Recap video worker: 45–90s, music bed, face/motion selection
       (Once's is widely reviewed as too short — this is a real opening)
 - [ ] Multiple rolls per event (ceremony / cocktail / dance floor)

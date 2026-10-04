@@ -72,5 +72,5 @@ psql: ## Open psql against the dev database
 	$(COMPOSE) exec db psql -U filmroll -d filmroll
 
 .PHONY: mobile
-mobile: ## Start the Expo guest camera (hosts stay on the web)
+mobile: ## Start the Expo app (host create + guest camera)
 	cd mobile && npm start

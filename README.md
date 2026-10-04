@@ -54,9 +54,9 @@ Open http://localhost:3000 — create a film, open `/f/{code}` as a guest, moder
 
 More detail: [web/README.md](web/README.md)
 
-### 3. Mobile (Expo guest camera)
+### 3. Mobile (Expo — host + guest)
 
-Requires the backend from step 1. Hosts still use the web.
+Requires the backend from step 1.
 
 ```bash
 cd mobile
@@ -66,6 +66,8 @@ npm start
 ```
 
 Press `i` for iOS Simulator, or scan the QR with **Expo Go** on a physical phone.
+
+**Create a film** on the home screen (Once-style), or **Join a film** with a code.
 
 More detail: [mobile/README.md](mobile/README.md)
 
@@ -83,7 +85,7 @@ Update **three** config files (replace the example IP):
 |------|------|
 | `.env` (root) | `S3_PUBLIC_ENDPOINT_URL=http://192.168.1.42:9000`, `PUBLIC_WEB_URL=http://192.168.1.42:3000`, add `http://192.168.1.42:3000` to `CORS_ORIGINS` |
 | `web/.env.local` | `NEXT_PUBLIC_API_URL=http://192.168.1.42:8000` |
-| `mobile/.env` | `EXPO_PUBLIC_API_URL=http://192.168.1.42:8000` |
+| `mobile/.env` | `EXPO_PUBLIC_API_URL=http://192.168.1.42:8000`, `EXPO_PUBLIC_WEB_URL=http://192.168.1.42:3000` |
 
 Then `make up` from the root (reload API/workers), restart `npm run dev` in `web/`, and `npx expo start -c` in `mobile/`.
 
@@ -91,11 +93,40 @@ Presigned upload URLs are signed against `S3_PUBLIC_ENDPOINT_URL`. If it still
 says `localhost`, join succeeds but uploads fail — the phone PUTs to itself.
 Full walkthrough and troubleshooting: [mobile/README.md](mobile/README.md).
 
+## App flow
+
+Filmroll follows the same loop as [Once](https://once.film): **hosts create in the
+native app** (or on the web), **guests join by QR or code** without downloading.
+
+```mermaid
+flowchart TD
+  HostApp["Host: mobile or web"] -->|"Create your film"| HostDash["Host screen: code + QR"]
+  HostDash -->|"scan QR or open link"| PWA["Web guest camera /f/CODE"]
+  HostDash -->|"read code, type it"| ExpoGuest["Expo guest: FilmScreen"]
+  HostDash -->|"filmroll://f/CODE"| ExpoGuest
+  ExpoGuest --> Camera["Join + shoot"]
+  PWA --> Camera
+```
+
+| Step | Web | Mobile (Expo) |
+|------|-----|---------------|
+| Create film | `/` → form → `/f/{code}/host` | **Create a film** on home screen |
+| Share with guests | QR + join link on host page | QR + share on HostScreen |
+| Join as guest | `/f/{code}` or scan QR | **Join a film** with code, or deep link |
+| Shoot | Browser camera + IndexedDB queue | Native camera + disk queue |
+| Moderate / pay (full) | `/f/{code}/host` | HostScreen: hide, develop, export, caps; paid tiers via web link |
+| View developed roll | `/f/{code}/gallery` | Gallery in FilmScreen |
+
+Scanning the host QR opens the **web PWA** by default (the QR encodes
+`PUBLIC_WEB_URL`). Universal links into the native app need a signed App Store
+build. Paid upgrades stay on web (Stripe) until StoreKit ships; free tier (5
+guests) works from either surface.
+
 ## Architecture
 
 ```
 web/       Next.js guest camera + host tools (`components/guest|host|pwa`)
-mobile/    Expo guest camera (`src/screens`, `src/api`). Hosts stay on the web.
+mobile/    Expo host create + guest camera (`src/screens`, `src/api`)
 backend/   FastAPI (`app/api`, `app/services`, `app/worker`)
 ```
 
@@ -167,7 +198,10 @@ would demand real infrastructure, and avoiding it means a small container copes.
 **Reveal is derived, never a stored flag.** It is computed in SQL as
 `revealed_at IS NOT NULL OR now() >= reveal_at`, using the database clock. Had a
 scheduled job owned that boolean, one dead worker would mean a wedding gallery
-that silently never opens.
+that silently never opens. A private film still develops on that same clock;
+the gallery then mints URLs only for the calling guest. The host inbox is the
+couple's copy of the whole roll. Guests who joined from the app can get a push
+when that happens; the host already has email.
 
 **Caps are enforced with a row lock, not just a conditional insert.** Under
 READ COMMITTED the count subquery takes no lock, so two simultaneous

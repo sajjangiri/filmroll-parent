@@ -21,11 +21,11 @@ Legend:
 | Shots per guest (film roll size) | done | 0 | P0 | web, ios |
 | Guest cap | done | 0 | P0 | web, ios |
 | Short film code (6 chars, QR-friendly) | done | 0 | P0 | api |
-| Instant reveal mode (live gallery) | todo | 3 | P1 | web, ios |
+| Instant reveal mode (live gallery) | done | 3 | P1 | web, ios |
 | Extend time / raise cap mid-event | done | 3 | P1 | web, ios |
 | Multiple rolls per event (ceremony / party) | todo | 6 | P2 | web, ios |
 | Duplicate a past film as a template | todo | 6 | P2 | web |
-| Archive / delete a film | todo | 3 | P1 | web, ios |
+| Archive / delete a film | done | 3 | P1 | web |
 
 ## 2. Guest join
 
@@ -39,7 +39,7 @@ Legend:
 | App Clip Codes (Apple visual code) | todo | 5 | P2 | clip |
 | NFC table tags | todo | 6 | P2 | ios, android |
 | Android/desktop fallback to PWA on same URL | done | 2 | P0 | web |
-| Optional PIN on the film | todo | 3 | P1 | api |
+| Optional PIN on the film | done | 3 | P1 | api, web, ios |
 | Geo or time-window lock | todo | 6 | P2 | api |
 | Guest list import (CSV) | todo | 6 | P2 | web |
 | Smart App Banner offering the iOS app | todo | 5 | P1 | web |
@@ -56,12 +56,12 @@ Legend:
 | Retry with backoff, resumable upload | done | 2 | P0 | web, ios |
 | Visible upload queue state | done | 2 | P0 | web, ios |
 | Front / back camera switch | done | 2 | P0 | web, ios, clip |
-| Flash / torch | todo | 2 | P1 | web, ios, clip |
-| Live filter preview (WebGL / Core Image) | todo | 2 | P1 | web, ios |
+| Flash / torch | done | 2 | P1 | web, ios |
+| Live filter preview (WebGL / Core Image) | done | 2 | P1 | web |
 | Originals stored clean, look applied at display | done | 1 | P1 | api |
 | Idempotent shot IDs (no double burn) | done | 1 | P0 | api |
 | Camera-roll upload | todo | 6 | P2 | web, ios (**not** clip) |
-| Guest video clips (5–15s) | todo | 6 | P2 | web, ios |
+| Guest video clips (≤15s) | done | 6 | P2 | web, ios, android |
 
 ## 4. Reveal + gallery
 
@@ -76,7 +76,7 @@ Legend:
 | Guest saves a single photo | todo | 3 | P1 | web, ios |
 | Reveal notification (email / push) | done | 3 | P1 | web, ios |
 | Ephemeral reveal notification (8h/24h) | todo | 5 | P2 | clip |
-| Live slideshow for a venue screen | todo | 6 | P2 | web |
+| Live slideshow for a venue screen | done | 6 | P2 | web |
 | Recap video, 45–90s with music | todo | 6 | P2 | api |
 | Favorites / hearts | todo | 6 | P2 | web, ios |
 
@@ -88,11 +88,11 @@ Legend:
 | Durable host auth (magic link / Apple) | done | 1 | P0 | web, ios |
 | **One-tap hide / moderation queue** | done | 3 | P0 | web, ios |
 | Hidden photos never fan out | done | 3 | P0 | api |
-| Co-hosts | todo | 3 | P1 | web, ios |
-| Photographer read-only seat | todo | 6 | P2 | web |
+| Co-hosts | done | 3 | P1 | web |
+| Photographer read-only seat | done | 3 | P2 | web |
 | Guest deletes own photo | done | 3 | P1 | api |
-| Private vs shared visibility | todo | 3 | P1 | web, ios |
-| Report a photo | todo | 3 | P1 | web |
+| Private vs shared visibility | done | 3 | P1 | web, ios |
+| Report a photo | done | 3 | P1 | web, ios |
 | NSFW detection assist (host decides) | todo | 6 | P2 | api |
 | Print-ready QR table cards (PDF) | done | 3 | P1 | web |
 
@@ -106,7 +106,8 @@ Legend:
 | Upgrade cap mid-event | done | 4 | P1 | web, ios |
 | StoreKit 2 IAP (full app only) | todo | 5 | P1 | ios |
 | Unlimited-shots add-on | done | 4 | P1 | web, ios |
-| Video pack add-on | todo | 6 | P2 | web, ios |
+| Video pack add-on | done | 6 | P2 | web (bought), ios/android (used) |
+| Receipts, refunds, VAT/tax | done | 4 | P1 | web, api |
 | Keep-forever storage after 12 months | done | 4 | P1 | web |
 | Photobook / prints | todo | 6 | P2 | web |
 | Planner / venue license, invoicing | todo | 6 | P2 | web |
@@ -122,10 +123,11 @@ Legend:
 | Self-hosted QR generation | done | 1 | P0 | api |
 | Rate limiting + abuse protection | done | 1 | P0 | api |
 | Installable PWA + service worker | done | 2 | P0 | web |
-| i18n (EN, ES, FR) | todo | 2 | P1 | web, ios |
+| i18n (EN, ES, FR) | done | 2 | P1 | web, ios |
+| Accessibility pass (guest flow) | done | 2 | P1 | web, ios |
 | Event-day observability dashboards | todo | 1 | P1 | api |
 | Associated domains + AASA | todo | 5 | P1 | api |
-| Android host app | todo | 6 | P2 | android |
+| Android host app | done | 6 | P2 | android |
 
 ---
 
