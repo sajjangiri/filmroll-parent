@@ -22,13 +22,17 @@ import {
   ApiError,
   captureShot,
   isRetryableUploadError,
+  newShotId,
 } from "../api/client";
+import type { CommitResponse, ShotKind } from "../api/types";
 
 export type QueuedShot = {
   shotId: string;
   code: string;
   token: string;
   fileUri: string;
+  /** Absent on rows queued before clips existed, which are all photos. */
+  kind?: ShotKind;
   createdAt: number;
   status: "pending" | "uploading" | "failed";
   attempts: number;
@@ -39,12 +43,15 @@ export type QueueSnapshot = {
   pending: number;
   uploading: number;
   failed: number;
+  /** Of pending + uploading, how many are clips. They spend a separate allowance. */
+  clipsWaiting: number;
 };
 
 export const EMPTY_SNAPSHOT: QueueSnapshot = {
   pending: 0,
   uploading: 0,
   failed: 0,
+  clipsWaiting: 0,
 };
 
 const metaKey = (code: string) => `filmroll-queue-${code}`;
@@ -104,11 +111,12 @@ async function saveShots(code: string, shots: QueuedShot[]): Promise<void> {
 }
 
 function countSnapshot(shots: QueuedShot[]): QueueSnapshot {
-  const snapshot: QueueSnapshot = { pending: 0, uploading: 0, failed: 0 };
+  const snapshot: QueueSnapshot = { pending: 0, uploading: 0, failed: 0, clipsWaiting: 0 };
   for (const shot of shots) {
     if (shot.status === "pending") snapshot.pending += 1;
     else if (shot.status === "uploading") snapshot.uploading += 1;
     else snapshot.failed += 1;
+    if (shot.status !== "failed" && shot.kind === "clip") snapshot.clipsWaiting += 1;
   }
   return snapshot;
 }
@@ -119,7 +127,9 @@ async function persistCopy(shotId: string, fromUri: string): Promise<string> {
   }
   const dir = `${documentDirectory}queued-shots/`;
   await makeDirectoryAsync(dir, { intermediates: true });
-  const dest = `${dir}${shotId}.jpg`;
+  // The extension is kept: it is how a clip's container type is known later.
+  const ext = fromUri.match(/\.(\w+)$/)?.[1]?.toLowerCase() ?? "jpg";
+  const dest = `${dir}${shotId}.${ext}`;
   await copyAsync({ from: fromUri, to: dest });
   return dest;
 }
@@ -142,14 +152,16 @@ export async function enqueueShot(input: {
   code: string;
   token: string;
   fileUri: string;
+  kind?: ShotKind;
 }): Promise<string> {
-  const shotId = crypto.randomUUID();
+  const shotId = newShotId();
   const fileUri = await persistCopy(shotId, input.fileUri);
   const shot: QueuedShot = {
     shotId,
     code: input.code,
     token: input.token,
     fileUri,
+    kind: input.kind ?? "photo",
     createdAt: Date.now(),
     status: "pending",
     attempts: 0,
@@ -225,9 +237,15 @@ async function uploadOne(shot: QueuedShot): Promise<void> {
   await refreshSnapshot(shot.code);
 
   try {
-    const committed = await captureShot(shot.code, shot.token, shot.fileUri, shot.shotId);
+    const committed = await captureShot(
+      shot.code,
+      shot.token,
+      shot.fileUri,
+      shot.shotId,
+      shot.kind ?? "photo",
+    );
     await deleteShot(shot);
-    listenersForSuccess.forEach((fn) => fn(shot, committed.shots_remaining));
+    listenersForSuccess.forEach((fn) => fn(shot, committed));
   } catch (error) {
     if (isRetryableUploadError(error) && shot.attempts < 8) {
       shot.status = "pending";
@@ -245,7 +263,7 @@ async function uploadOne(shot: QueuedShot): Promise<void> {
   }
 }
 
-type ShotListener = (shot: QueuedShot, remaining: number) => void;
+type ShotListener = (shot: QueuedShot, committed: CommitResponse) => void;
 type FailListener = (shot: QueuedShot, error: unknown) => void;
 
 const listenersForSuccess = new Set<ShotListener>();
@@ -267,6 +285,10 @@ export function onShotFailed(listener: FailListener): () => void {
 
 export function isCapError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 409 && /every shot/i.test(error.message);
+}
+
+export function isClipCapError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 409 && /every clip/i.test(error.message);
 }
 
 export function isClosedError(error: unknown): boolean {

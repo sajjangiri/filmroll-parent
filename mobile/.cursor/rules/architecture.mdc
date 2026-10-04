@@ -1,5 +1,5 @@
 ---
-description: Filmroll Expo guest-camera architecture. Guest-only, presigned PUT, no App Clip.
+description: Filmroll Expo architecture. Host create + guest camera, presigned PUT, no App Clip.
 globs: "**/*.{ts,tsx,json}"
 alwaysApply: false
 ---
@@ -9,5 +9,5 @@ alwaysApply: false
 Read `.cursor/skills/filmroll-mobile/SKILL.md` and Expo SDK 57 docs before changing this tree.
 
 - Screens in `src/screens/`. API in `src/api/`.
-- Same reserve → PUT → commit contract as web. No host tools. No App Clip.
+- Same reserve → PUT → commit contract as web. Create film + share on native; full host dashboard on web until Phase 5. No App Clip.
 - Continue the existing plan in `.cursor/skills/filmroll-mobile/continue.md`.
