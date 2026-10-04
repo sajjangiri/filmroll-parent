@@ -1,8 +1,9 @@
-"""Host emails: magic-link recovery, reveal, and the month-11 storage warning.
+"""Host emails and guest reveal push.
 
 Beat runs these on a timer. Reveal also kicks the developed-film pass after a
 host taps "develop now", so the morning-after mail is not waiting on the next
-tick. Both paths share the same idempotent columns.
+tick. Both paths share the same idempotent `reveal_notified_at` column. Guest
+push rides that same pass: missing host email must not skip the phones.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.logging import get_logger
 from app.db.models import Film
-from app.services import mail, tokens
+from app.services import mail, push, tokens
 from app.services.catalog import KEEP_FOREVER
 
 log = get_logger(__name__)
@@ -95,14 +96,21 @@ def send_retention_warning(film: Film) -> None:
 
 
 def notify_developed_films(session: Session) -> int:
-    """Email hosts whose films have developed and have not been notified yet."""
+    """Tell people a film has developed: email the host, push the guests.
+
+    Instant films are skipped — they are born developed, and a "ready" notice
+    would land seconds after create. Push failures must not block the email,
+    and a missing host email must not skip the guests.
+    """
     developed = or_(Film.revealed_at.isnot(None), Film.reveal_at <= func.now())
     rows = list(
         session.execute(
             select(Film).where(
                 Film.deleted_at.is_(None),
-                Film.host_email.isnot(None),
                 Film.reveal_notified_at.is_(None),
+                # A live film is born developed. "Your film is ready" would land
+                # seconds after the host created it, saying nothing.
+                Film.instant_reveal.is_(False),
                 developed,
             )
         )
@@ -113,6 +121,8 @@ def notify_developed_films(session: Session) -> int:
     now = datetime.now(UTC)
     for film in rows:
         send_developed(film)
+        guests = push.tokens_for_film(session, film.id)
+        push.send_developed(film.title, film.code, guests)
         film.reveal_notified_at = now
         sent += 1
     if sent:

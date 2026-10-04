@@ -56,12 +56,26 @@ def _signing_client() -> Any:
 # archive originals independently of derivatives.
 
 
-def original_key(film_id: str, shot_id: str) -> str:
-    return f"films/{film_id}/originals/{shot_id}.jpg"
+def original_key(film_id: str, shot_id: str, ext: str = "jpg") -> str:
+    return f"films/{film_id}/originals/{shot_id}.{ext}"
 
 
 def derivative_key(film_id: str, shot_id: str, size: str) -> str:
     return f"films/{film_id}/derivatives/{size}/{shot_id}.webp"
+
+
+def display_key(film_id: str, shot_id: str) -> str:
+    """The 1280 px re-encode of a photo, EXIF stripped. Written by generate_derivatives."""
+    return derivative_key(film_id, shot_id, "display")
+
+
+def clip_key(film_id: str, shot_id: str) -> str:
+    """The transcoded clip. The only video object ever served or exported."""
+    return f"films/{film_id}/derivatives/clip/{shot_id}.mp4"
+
+
+def poster_key(film_id: str, shot_id: str) -> str:
+    return derivative_key(film_id, shot_id, "poster")
 
 
 def export_key(film_id: str, export_id: str) -> str:
@@ -132,26 +146,30 @@ async def object_exists(key: str) -> bool:
     return await stat_object(key) is not None
 
 
-async def delete_prefix(prefix: str) -> int:
-    """Delete every object under a prefix. Used when a film is removed."""
+def delete_prefix_sync(prefix: str) -> int:
+    """Delete every object under a prefix. Used when a film is purged.
+
+    Paginated because a large wedding is thousands of objects and
+    ``delete_objects`` takes a thousand keys per call.
+    """
     settings = get_settings()
+    client = _internal_client()
+    paginator = client.get_paginator("list_objects_v2")
+    removed = 0
+    for page in paginator.paginate(Bucket=settings.s3_bucket, Prefix=prefix):
+        contents = page.get("Contents", [])
+        if not contents:
+            continue
+        client.delete_objects(
+            Bucket=settings.s3_bucket,
+            Delete={"Objects": [{"Key": item["Key"]} for item in contents]},
+        )
+        removed += len(contents)
+    return removed
 
-    def _delete() -> int:
-        client = _internal_client()
-        paginator = client.get_paginator("list_objects_v2")
-        removed = 0
-        for page in paginator.paginate(Bucket=settings.s3_bucket, Prefix=prefix):
-            contents = page.get("Contents", [])
-            if not contents:
-                continue
-            client.delete_objects(
-                Bucket=settings.s3_bucket,
-                Delete={"Objects": [{"Key": item["Key"]} for item in contents]},
-            )
-            removed += len(contents)
-        return removed
 
-    return await asyncio.to_thread(_delete)
+async def delete_prefix(prefix: str) -> int:
+    return await asyncio.to_thread(delete_prefix_sync, prefix)
 
 
 async def delete_object(key: str) -> None:
@@ -168,6 +186,11 @@ def download_bytes(key: str) -> bytes:
     settings = get_settings()
     response = _internal_client().get_object(Bucket=settings.s3_bucket, Key=key)
     return bytes(response["Body"].read())
+
+
+def download_file(key: str, path: str) -> None:
+    settings = get_settings()
+    _internal_client().download_file(settings.s3_bucket, key, path)
 
 
 def upload_bytes(key: str, data: bytes, content_type: str) -> None:

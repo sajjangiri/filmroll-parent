@@ -30,6 +30,7 @@ os.environ["MAX_UPLOAD_BYTES"] = "65536"
 os.environ["PUBLIC_WEB_URL"] = "http://localhost:3000"
 os.environ["BILLING_FAKE"] = "true"
 os.environ["SMTP_HOST"] = ""
+os.environ["EXPO_PUSH_URL"] = ""
 
 import uuid  # noqa: E402
 from collections.abc import AsyncIterator  # noqa: E402
@@ -99,7 +100,10 @@ async def _clean_tables() -> AsyncIterator[None]:
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.execute(
-            text("TRUNCATE films, guests, shots, payments RESTART IDENTITY CASCADE")
+            text(
+                "TRUNCATE films, guests, shots, payments, film_seats, shot_reports "
+                "RESTART IDENTITY CASCADE"
+            )
         )
     from app.services import mail
 
@@ -174,6 +178,26 @@ async def join(client: AsyncClient, code: str, name: str = "Guest") -> str:
 
 def auth(token: str) -> dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+async def invite_seat(
+    client: AsyncClient, code: str, host_token: str, *, role: str, label: str = "Helper"
+) -> tuple[str, str]:
+    """Create and claim a seat, returning (seat_id, seat_token)."""
+    created = await client.post(
+        f"/v1/films/{code}/seats",
+        json={"role": role, "label": label},
+        headers=auth(host_token),
+    )
+    assert created.status_code == 201, created.text
+    body = created.json()
+
+    claimed = await client.post(
+        f"/v1/films/{code}/seats/claim",
+        json={"invite_token": body["invite_token"]},
+    )
+    assert claimed.status_code == 200, claimed.text
+    return body["seat"]["id"], claimed.json()["token"]
 
 
 # Structurally valid JPEG; storage does not care about pixel content.

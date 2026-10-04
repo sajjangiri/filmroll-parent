@@ -33,7 +33,7 @@ Routers stay thin. Domain rules live in `app/services/`. New tables go through A
 4. **`Shot.id` has no server default.** Client UUID. Unique constraint makes retries idempotent.
 5. **Celery after commit only** (`enqueue_after_commit`). Queues: `fast` (thumbs, mail, sweep) vs `media` (ZIP, future recap).
 6. **Two S3 endpoints.** Sign public URLs with the host a phone can resolve. Internal compose hostname on a signed URL is a user-facing outage.
-7. **Private bucket.** Signed GET only after develop (or host review). Hidden shots never fan out.
+7. **Private bucket.** Signed GET only after develop (or host review). Hidden shots never fan out. A private (`shared_gallery=false`) gallery still develops; URLs are minted only for the calling guest. Host tokens must not unlock `GET /gallery`.
 8. **`guest_cap <= entitled_guest_cap`.** Raising the cap is Checkout, not PATCH. Catalog is `app/services/catalog.py`, not Stripe Products.
 9. **Charge for capacity, not shutter presses.** Fake Checkout locally (`BILLING_FAKE`); ignored in production.
 10. **Host email is never on `FilmPublic`.** Recover always 204 (no enumeration).

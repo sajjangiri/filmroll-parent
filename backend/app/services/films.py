@@ -15,15 +15,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
+from app.core.logging import get_logger
 from app.db.models import Film, Guest, Shot, ShotState
-from app.services import storage
-from app.services.catalog import FREE_GUEST_CAP, STORAGE_INCLUDED_DAYS
+from app.services import pins, storage
+from app.services.catalog import CLIPS_PER_GUEST, FREE_GUEST_CAP, STORAGE_INCLUDED_DAYS
 from app.services.notify import normalize_email
 
 # Ambiguous glyphs removed: no O/0, no I/1, so a code read off a table card or
 # an OCR'd QR fallback cannot be mistyped.
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 CODE_LENGTH = 6
+
+log = get_logger(__name__)
 
 
 class FilmError(Exception):
@@ -44,6 +47,14 @@ class GuestCapReached(FilmError):
 
 class ShotLimitReached(FilmError):
     pass
+
+
+class ClipLimitReached(FilmError):
+    pass
+
+
+class VideoPackRequired(FilmError):
+    """Clips are a paid add-on; this film has not bought it."""
 
 
 class ShotNotFound(FilmError):
@@ -82,6 +93,15 @@ class CapAboveEntitlement(FilmError):
     pass
 
 
+class RevealLocked(FilmError):
+    """The reveal time can no longer be moved.
+
+    Developing is one-way. Once a gallery has been open, pushing the reveal into
+    the future would hide photos guests have already seen, so the schedule
+    freezes the moment a film develops.
+    """
+
+
 class InvalidEmail(FilmError):
     pass
 
@@ -111,13 +131,19 @@ class FilmView:
         self.is_closed = is_closed
 
 
-async def load_by_code(session: AsyncSession, code: str) -> FilmView:
+async def load_by_code(
+    session: AsyncSession, code: str, *, include_deleted: bool = False
+) -> FilmView:
+    """Deleted films are invisible by default.
+
+    ``include_deleted`` exists for exactly one caller, restore, which has to be
+    able to see what everything else is required to pretend is gone.
+    """
+    conditions = [func.upper(Film.code) == code.upper()]
+    if not include_deleted:
+        conditions.append(Film.deleted_at.is_(None))
     row = (
-        await session.execute(
-            select(Film, _IS_DEVELOPED, _IS_CLOSED).where(
-                func.upper(Film.code) == code.upper(), Film.deleted_at.is_(None)
-            )
-        )
+        await session.execute(select(Film, _IS_DEVELOPED, _IS_CLOSED).where(*conditions))
     ).first()
     if row is None:
         raise FilmNotFound(code)
@@ -148,10 +174,12 @@ async def create_film(
     title: str,
     event_type: str,
     closes_at: datetime,
-    reveal_at: datetime,
+    reveal_at: datetime | None,
     shot_limit: int,
     guest_cap: int,
     host_email: str | None = None,
+    instant_reveal: bool = False,
+    shared_gallery: bool = True,
 ) -> Film:
     # Codes are short enough that collisions are possible; retry rather than
     # surfacing a unique-violation to the host.
@@ -163,6 +191,18 @@ async def create_film(
     else:  # pragma: no cover - astronomically unlikely
         raise FilmError("could not allocate a unique film code")
 
+    # A live film develops the moment it exists. Stamp revealed_at as well as
+    # reveal_at: Python now() can sit a millisecond ahead of Postgres now(),
+    # and `now() >= reveal_at` would then be false on the create response.
+    if instant_reveal:
+        now = datetime.now(UTC)
+        reveal_at = now
+        revealed_at: datetime | None = now
+    elif reveal_at is None:
+        raise FilmError("a scheduled film needs a reveal time")
+    else:
+        revealed_at = None
+
     entitled = FREE_GUEST_CAP
     film = Film(
         code=code,
@@ -170,6 +210,9 @@ async def create_film(
         event_type=event_type,
         closes_at=closes_at,
         reveal_at=reveal_at,
+        revealed_at=revealed_at,
+        instant_reveal=instant_reveal,
+        shared_gallery=shared_gallery,
         shot_limit=shot_limit,
         guest_cap=min(guest_cap, entitled),
         entitled_guest_cap=entitled,
@@ -204,20 +247,39 @@ async def join_film(session: AsyncSession, film: Film, display_name: str) -> Gue
     return guest
 
 
-_RESERVE_SQL = text(
+_RESERVE_PHOTO_SQL = text(
     """
-    INSERT INTO shots (id, film_id, guest_id, state, storage_key, content_type, reserved_at)
-    SELECT :shot_id, :film_id, :guest_id, 'reserved', :storage_key, :content_type, now()
+    INSERT INTO shots (id, film_id, guest_id, state, storage_key, content_type, kind, reserved_at)
+    SELECT :shot_id, :film_id, :guest_id, 'reserved', :storage_key, :content_type, 'photo', now()
     WHERE (
         SELECT unlimited_shots FROM films WHERE id = :film_id
     ) OR (
         SELECT count(*) FROM shots
-        WHERE guest_id = :guest_id AND state <> 'expired'
+        WHERE guest_id = :guest_id AND state <> 'expired' AND kind = 'photo'
     ) < (SELECT shot_limit FROM films WHERE id = :film_id)
     ON CONFLICT (id) DO NOTHING
     RETURNING id
     """
 )
+
+# The pack is re-read here rather than trusted from the loaded film, for the
+# same reason the photo cap is: this statement is the only thing that decides.
+_RESERVE_CLIP_SQL = text(
+    """
+    INSERT INTO shots (id, film_id, guest_id, state, storage_key, content_type, kind, reserved_at)
+    SELECT :shot_id, :film_id, :guest_id, 'reserved', :storage_key, :content_type, 'clip', now()
+    WHERE (
+        SELECT video_pack FROM films WHERE id = :film_id
+    ) AND (
+        SELECT count(*) FROM shots
+        WHERE guest_id = :guest_id AND state <> 'expired' AND kind = 'clip'
+    ) < :clip_limit
+    ON CONFLICT (id) DO NOTHING
+    RETURNING id
+    """
+)
+
+_CLIP_EXTENSIONS = {"video/mp4": "mp4", "video/quicktime": "mov", "video/webm": "webm"}
 
 
 async def reserve_shot(
@@ -227,6 +289,7 @@ async def reserve_shot(
     guest_id: uuid.UUID,
     shot_id: uuid.UUID,
     content_type: str = "image/jpeg",
+    kind: str = "photo",
 ) -> tuple[str, bool]:
     """Claim a slot in the roll. Returns (storage_key, was_already_reserved).
 
@@ -234,21 +297,31 @@ async def reserve_shot(
     idempotent: a phone on venue wifi will retry, and every retry collapses onto
     the same row and the same object.
     """
+    if kind == "clip":
+        if not film.video_pack:
+            raise VideoPackRequired(film.code)
+        content_type = content_type.split(";")[0].strip().lower()
+        if content_type not in get_settings().allowed_clip_type_set:
+            raise UploadTypeRejected(content_type)
+
     # Serialise reservations for this guest. See join_film for why counting
     # alone is not enough under READ COMMITTED.
     await session.execute(select(Guest.id).where(Guest.id == guest_id).with_for_update())
 
-    key = storage.original_key(str(film.id), str(shot_id))
-    inserted = await session.scalar(
-        _RESERVE_SQL,
-        {
-            "shot_id": shot_id,
-            "film_id": film.id,
-            "guest_id": guest_id,
-            "storage_key": key,
-            "content_type": content_type,
-        },
-    )
+    params: dict[str, object] = {
+        "shot_id": shot_id,
+        "film_id": film.id,
+        "guest_id": guest_id,
+        "content_type": content_type,
+    }
+    if kind == "clip":
+        key = storage.original_key(str(film.id), str(shot_id), _CLIP_EXTENSIONS[content_type])
+        params |= {"storage_key": key, "clip_limit": CLIPS_PER_GUEST}
+        inserted = await session.scalar(_RESERVE_CLIP_SQL, params)
+    else:
+        key = storage.original_key(str(film.id), str(shot_id))
+        params["storage_key"] = key
+        inserted = await session.scalar(_RESERVE_PHOTO_SQL, params)
     if inserted is not None:
         return key, False
 
@@ -260,7 +333,15 @@ async def reserve_shot(
     if existing is not None:
         return existing.storage_key, True
 
+    if kind == "clip":
+        raise ClipLimitReached(str(guest_id))
     raise ShotLimitReached(str(guest_id))
+
+
+async def shot_content_type(session: AsyncSession, shot_id: uuid.UUID) -> str:
+    return (await session.scalar(select(Shot.content_type).where(Shot.id == shot_id))) or (
+        "image/jpeg"
+    )
 
 
 async def commit_shot(
@@ -294,12 +375,15 @@ async def commit_shot(
     # uploads are deleted rather than left to the sweeper: storage is billed by
     # the byte, and the slot is handed straight back.
     settings = get_settings()
-    if info.size > settings.max_upload_bytes:
+    is_clip = shot.kind == "clip"
+    max_bytes = settings.max_clip_bytes if is_clip else settings.max_upload_bytes
+    allowed = settings.allowed_clip_type_set if is_clip else settings.allowed_upload_type_set
+    if info.size > max_bytes:
         await storage.delete_object(shot.storage_key)
         await _release_reservation(session, shot_id)
-        raise UploadTooLarge(f"{info.size} bytes exceeds {settings.max_upload_bytes}")
+        raise UploadTooLarge(f"{info.size} bytes exceeds {max_bytes}")
 
-    if info.content_type not in settings.allowed_upload_type_set:
+    if (info.content_type or "").split(";")[0].strip().lower() not in allowed:
         await storage.delete_object(shot.storage_key)
         await _release_reservation(session, shot_id)
         raise UploadTypeRejected(info.content_type or "unknown")
@@ -329,6 +413,48 @@ async def _release_reservation(session: AsyncSession, shot_id: uuid.UUID) -> Non
     """
     await session.execute(update(Shot).where(Shot.id == shot_id).values(state=ShotState.EXPIRED))
     await session.commit()
+
+
+async def set_join_pin(session: AsyncSession, film: Film, pin: str | None) -> None:
+    """``None`` removes the gate. Guests already inside are unaffected either
+    way: their token is what proves they joined, not the PIN."""
+    film.join_pin_hash = None if pin is None else pins.hash_pin(pin)
+    await session.flush()
+    log.info("film.pin_set", film_id=str(film.id), enabled=pin is not None)
+
+
+class FilmAlreadyPurged(Exception):
+    """The grace period lapsed and the photos are gone. Nothing to restore."""
+
+
+def purge_deadline(deleted_at: datetime) -> datetime:
+    return deleted_at + timedelta(days=get_settings().deleted_film_grace_days)
+
+
+async def soft_delete(session: AsyncSession, film: Film) -> datetime:
+    """Take the film away now, destroy the photos later.
+
+    Guests and the gallery 404 from this moment, which is what a host asking to
+    delete an event actually wants. The bytes survive the grace window because
+    these are usually the only copies of the photographs in existence, and an
+    accidental tap should not be the end of them.
+
+    Returns the moment the objects become unrecoverable.
+    """
+    if film.deleted_at is None:
+        film.deleted_at = datetime.now(UTC)
+        await session.flush()
+        log.info("film.deleted", film_id=str(film.id), code=film.code)
+    return purge_deadline(film.deleted_at)
+
+
+async def restore(session: AsyncSession, film: Film) -> None:
+    if film.purged_at is not None:
+        raise FilmAlreadyPurged(film.code)
+    if film.deleted_at is not None:
+        film.deleted_at = None
+        await session.flush()
+        log.info("film.restored", film_id=str(film.id), code=film.code)
 
 
 async def reveal_now(session: AsyncSession, film: Film) -> None:
@@ -378,6 +504,7 @@ async def update_film(
     shot_limit: int | None = None,
     guest_cap: int | None = None,
     host_email: str | None = None,
+    shared_gallery: bool | None = None,
 ) -> Film:
     if guest_cap is not None:
         current = await guest_count(session, film.id)
@@ -393,7 +520,7 @@ async def update_film(
         fullest = await session.scalar(
             select(func.count())
             .select_from(Shot)
-            .where(Shot.film_id == film.id, Shot.state != ShotState.EXPIRED)
+            .where(Shot.film_id == film.id, Shot.state != ShotState.EXPIRED, Shot.kind == "photo")
             .group_by(Shot.guest_id)
             .order_by(func.count().desc())
             .limit(1)
@@ -404,10 +531,20 @@ async def update_film(
 
     if closes_at is not None:
         film.closes_at = closes_at
-    if reveal_at is not None:
+
+    # Re-sending the current value is how the dashboard saves a form, so only a
+    # real change is judged.
+    if reveal_at is not None and reveal_at != film.reveal_at:
+        now = datetime.now(UTC)
+        if film.instant_reveal:
+            raise RevealLocked("a live film has no reveal time to set")
+        if (film.revealed_at is not None or film.reveal_at <= now) and reveal_at > now:
+            raise RevealLocked("this film has already developed; its photos are out")
         film.reveal_at = reveal_at
     if host_email is not None:
         film.host_email = _optional_email(host_email) if host_email else None
+    if shared_gallery is not None:
+        film.shared_gallery = shared_gallery
 
     await session.flush()
     await session.refresh(film)
@@ -417,19 +554,32 @@ async def update_film(
 # --------------------------------------------------------------------- queries
 
 
-async def visible_shots(session: AsyncSession, film_id: uuid.UUID) -> list[Shot]:
+# A clip's original is whatever the phone recorded: any length, any codec, with
+# its GPS track still in the metadata. Only the transcode is ever served, so a
+# clip is not a shot at all until the worker has produced it.
+_IS_PLAYABLE = (Shot.kind == "photo") | Shot.derivative_at.isnot(None)
+
+
+async def visible_shots(
+    session: AsyncSession, film_id: uuid.UUID, *, guest_id: uuid.UUID | None = None
+) -> list[Shot]:
     """Shots eligible to be shown, exported or fed into a recap.
 
     Hidden and still-reserved shots are excluded here, in one place, so no
-    caller can accidentally leak them.
+    caller can accidentally leak them. ``guest_id`` narrows to one guest's
+    roll, which is how a private gallery is enforced without a second query.
     """
+    conditions = [
+        Shot.film_id == film_id,
+        Shot.state == ShotState.UPLOADED,
+        Shot.hidden_at.is_(None),
+        _IS_PLAYABLE,
+    ]
+    if guest_id is not None:
+        conditions.append(Shot.guest_id == guest_id)
     result = await session.execute(
         select(Shot)
-        .where(
-            Shot.film_id == film_id,
-            Shot.state == ShotState.UPLOADED,
-            Shot.hidden_at.is_(None),
-        )
+        .where(*conditions)
         # Eager-loaded because the gallery renders attribution. A lazy load
         # would raise MissingGreenlet under the async session.
         .options(selectinload(Shot.guest))
@@ -446,7 +596,7 @@ async def review_shots(session: AsyncSession, film_id: uuid.UUID) -> list[Shot]:
     """
     result = await session.execute(
         select(Shot)
-        .where(Shot.film_id == film_id, Shot.state == ShotState.UPLOADED)
+        .where(Shot.film_id == film_id, Shot.state == ShotState.UPLOADED, _IS_PLAYABLE)
         .options(selectinload(Shot.guest))
         .order_by(Shot.uploaded_at)
     )
@@ -456,12 +606,24 @@ async def review_shots(session: AsyncSession, film_id: uuid.UUID) -> list[Shot]:
 async def shots_remaining(session: AsyncSession, *, film: Film, guest_id: uuid.UUID) -> int:
     if film.unlimited_shots:
         return 10_000
+    used = await _count_live(session, guest_id=guest_id, kind="photo")
+    return max(film.shot_limit - used, 0)
+
+
+async def clips_remaining(session: AsyncSession, *, film: Film, guest_id: uuid.UUID) -> int:
+    if not film.video_pack:
+        return 0
+    used = await _count_live(session, guest_id=guest_id, kind="clip")
+    return max(CLIPS_PER_GUEST - used, 0)
+
+
+async def _count_live(session: AsyncSession, *, guest_id: uuid.UUID, kind: str) -> int:
     used = await session.scalar(
         select(func.count())
         .select_from(Shot)
-        .where(Shot.guest_id == guest_id, Shot.state != ShotState.EXPIRED)
+        .where(Shot.guest_id == guest_id, Shot.state != ShotState.EXPIRED, Shot.kind == kind)
     )
-    return max(film.shot_limit - (used or 0), 0)
+    return used or 0
 
 
 def _optional_email(raw: str | None) -> str | None:

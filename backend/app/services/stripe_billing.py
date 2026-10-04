@@ -88,6 +88,14 @@ def create_checkout_session(
     }
     if settings.stripe_automatic_tax:
         params["automatic_tax"] = {"enabled": True}
+        # Stripe cannot pick a jurisdiction without one, and a wrong VAT rate is
+        # the host's problem to unwind, not ours.
+        params["billing_address_collection"] = "required"
+        # A company buying a staff party needs its VAT number on the invoice to
+        # reclaim the tax; without this they have to ask support for a reissue.
+        params["tax_id_collection"] = {"enabled": True}
+        line_item = params["line_items"][0]
+        line_item["price_data"]["tax_behavior"] = settings.stripe_tax_behavior
 
     stripe.api_key = settings.stripe_secret_key
     try:
@@ -105,6 +113,33 @@ def create_checkout_session(
         amount_cents=amount_cents,
     )
     return created.id, url, False
+
+
+def fetch_receipt_url(payment_intent_id: str) -> str | None:
+    """Stripe hosts the receipt; the URL only exists on the charge.
+
+    Called once at fulfillment rather than on every host page view, and never
+    on the fake path, where there is no charge to look up. A failure here is
+    logged and swallowed: a missing receipt link must not fail a paid webhook,
+    or Stripe will retry a payment we already granted.
+    """
+    settings = get_settings()
+    if settings.use_fake_billing or not settings.stripe_configured:
+        return None
+
+    stripe.api_key = settings.stripe_secret_key
+    try:
+        intent = stripe.PaymentIntent.retrieve(payment_intent_id, expand=["latest_charge"])
+    except stripe.StripeError as exc:
+        log.warning(
+            "billing.receipt_lookup_failed", payment_intent=payment_intent_id, error=str(exc)
+        )
+        return None
+
+    charge = intent.latest_charge
+    # Expanded, this is a Charge object; unexpanded it is a bare id string.
+    url = getattr(charge, "receipt_url", None)
+    return str(url) if url else None
 
 
 def parse_webhook(payload: bytes, signature: str) -> dict[str, Any]:
@@ -139,6 +174,9 @@ def checkout_completed_payload(
     *,
     session_id: str,
     payment_intent: str = "pi_test",
+    amount_total: int | None = None,
+    amount_tax: int = 0,
+    customer_email: str | None = None,
 ) -> bytes:
     """A minimal ``checkout.session.completed`` body for tests."""
     body = {
@@ -151,6 +189,35 @@ def checkout_completed_payload(
                 "object": "checkout.session",
                 "payment_status": "paid",
                 "payment_intent": payment_intent,
+                "amount_total": amount_total,
+                "total_details": {"amount_tax": amount_tax},
+                "customer_details": {"email": customer_email},
+            }
+        },
+    }
+    return json.dumps(body, separators=(",", ":")).encode()
+
+
+def charge_refunded_payload(
+    *,
+    payment_intent: str = "pi_test",
+    amount_refunded: int,
+    refunded: bool = True,
+    receipt_url: str | None = None,
+) -> bytes:
+    """A minimal ``charge.refunded`` body for tests."""
+    body = {
+        "id": f"evt_{uuid.uuid4().hex}",
+        "object": "event",
+        "type": "charge.refunded",
+        "data": {
+            "object": {
+                "id": f"ch_{uuid.uuid4().hex}",
+                "object": "charge",
+                "payment_intent": payment_intent,
+                "amount_refunded": amount_refunded,
+                "refunded": refunded,
+                "receipt_url": receipt_url,
             }
         },
     }

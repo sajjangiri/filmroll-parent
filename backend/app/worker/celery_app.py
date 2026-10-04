@@ -31,8 +31,12 @@ celery_app.conf.update(
     # stall hundreds of thumbnail jobs behind it.
     task_routes={
         "app.worker.tasks.generate_derivatives": {"queue": "fast"},
+        # Needs ffmpeg, which only the media image has.
+        "app.worker.tasks.transcode_clip": {"queue": "media"},
         "app.worker.tasks.sweep_abandoned_reservations": {"queue": "fast"},
         "app.worker.tasks.purge_film_objects": {"queue": "fast"},
+        # Deletes a prefix at a time, so it belongs with the other slow jobs.
+        "app.worker.tasks.purge_deleted_films": {"queue": "media"},
         "app.worker.tasks.build_recap_video": {"queue": "media"},
         "app.worker.tasks.build_export_archive": {"queue": "media"},
         "app.worker.tasks.send_host_login": {"queue": "fast"},
@@ -43,6 +47,10 @@ celery_app.conf.update(
         "app.worker.tasks.build_export_archive": {
             "soft_time_limit": 600,
             "time_limit": 900,
+        },
+        "app.worker.tasks.transcode_clip": {
+            "soft_time_limit": 300,
+            "time_limit": 360,
         },
         "app.worker.tasks.generate_derivatives": {
             "soft_time_limit": 60,
@@ -60,6 +68,12 @@ celery_app.conf.update(
         },
         "notify-retention-films": {
             "task": "app.worker.tasks.notify_retention_films",
+            "schedule": 3600.0,
+        },
+        # Erasure is measured in days, so hourly is already far more precise
+        # than the grace window it enforces.
+        "purge-deleted-films": {
+            "task": "app.worker.tasks.purge_deleted_films",
             "schedule": 3600.0,
         },
     },

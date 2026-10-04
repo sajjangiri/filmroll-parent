@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     download_url_ttl_seconds: int = 300
     reservation_ttl_minutes: int = 30
 
+    # A deleted film disappears immediately but its bytes are kept this long, so
+    # a mistap on the one copy of somebody's wedding is recoverable. Nothing in
+    # the product surfaces a deleted film during the window.
+    deleted_film_grace_days: int = 30
+
     # Where guests land when they scan a QR code. The API builds the join URL
     # itself so printed cards and the mobile app cannot disagree about it.
     public_web_url: str = "http://localhost:3000"
@@ -53,6 +58,10 @@ class Settings(BaseSettings):
     # checked after the fact, on commit.
     max_upload_bytes: int = 25 * 1024 * 1024
     allowed_upload_types: str = "image/jpeg,image/png,image/webp,image/heic"
+    # A 15 s phone clip at 1080p is ~30 MB; the headroom covers 4K phones. The
+    # worker trims to the clip limit anyway, so this only bounds storage abuse.
+    max_clip_bytes: int = 120 * 1024 * 1024
+    allowed_clip_types: str = "video/mp4,video/quicktime,video/webm"
 
     # Fixed-window limits. Generous enough that a real guest at an event never
     # notices, tight enough that a script cannot exhaust a film.
@@ -65,6 +74,9 @@ class Settings(BaseSettings):
     stripe_secret_key: str = ""
     stripe_webhook_secret: str = ""
     stripe_automatic_tax: bool = False
+    # Catalog prices are what the host expects to pay, so tax is added on top by
+    # default. Sell VAT-inclusive in the EU by flipping this to "inclusive".
+    stripe_tax_behavior: str = "exclusive"
     billing_fake: bool = True
 
     # Local default is Mailpit on the compose network. Empty host means the
@@ -78,12 +90,22 @@ class Settings(BaseSettings):
 
     rate_limit_recover_per_hour: int = 8
 
+    # Expo's push gateway. Empty means messages land in ``app.services.push.outbox``
+    # instead of opening a socket — the same trick mail uses in tests.
+    expo_push_url: str = ""
+
     # Used to mint the Apple associated-domain file. TEAMID is a placeholder
     # until App Store Connect exists; the route still has to be served so a
     # CDN in front of us cannot 404 the well-known path.
     apple_team_id: str = ""
     ios_bundle_id: str = "app.filmroll"
     ios_clip_bundle_id: str = "app.filmroll.Clip"
+
+    # Android App Links. Comma-separated SHA-256 fingerprints of the signing
+    # certificates (debug keystore, upload key, Play app signing). Empty serves
+    # an empty list: links still open the PWA, they just do not jump into the app.
+    android_package: str = "app.filmroll"
+    android_cert_sha256: str = ""
 
     @property
     def use_fake_billing(self) -> bool:
@@ -103,6 +125,12 @@ class Settings(BaseSettings):
     def allowed_upload_type_set(self) -> frozenset[str]:
         return frozenset(
             item.strip().lower() for item in self.allowed_upload_types.split(",") if item.strip()
+        )
+
+    @property
+    def allowed_clip_type_set(self) -> frozenset[str]:
+        return frozenset(
+            item.strip().lower() for item in self.allowed_clip_types.split(",") if item.strip()
         )
 
     @property

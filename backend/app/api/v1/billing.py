@@ -71,14 +71,19 @@ async def stripe_webhook(request: Request, session: DbSession) -> dict[str, str]
         if data.get("payment_status") != "paid":
             return {"status": "ignored"}
         session_id = str(data.get("id") or "")
-        payment_intent = data.get("payment_intent")
-        if isinstance(payment_intent, dict):
-            payment_intent = payment_intent.get("id")
+        payment_intent = _intent_id(data.get("payment_intent"))
+        totals = data.get("total_details") or {}
+        customer = data.get("customer_details") or {}
+        receipt = stripe_billing.fetch_receipt_url(payment_intent) if payment_intent else None
         try:
             await billing.fulfill_session(
                 session,
                 provider_session_id=session_id,
-                provider_payment_id=str(payment_intent) if payment_intent else None,
+                provider_payment_id=payment_intent,
+                total_cents=_as_int(data.get("amount_total")),
+                tax_cents=_as_int(totals.get("amount_tax")) or 0,
+                customer_email=_as_str(customer.get("email")),
+                receipt_url=receipt,
             )
         except billing.BillingError as exc:
             log.warning("billing.webhook_unknown_session", session_id=session_id, error=str(exc))
@@ -86,11 +91,30 @@ async def stripe_webhook(request: Request, session: DbSession) -> dict[str, str]
         return {"status": "ok"}
 
     if event_type == "charge.refunded":
-        payment_intent = data.get("payment_intent")
-        if isinstance(payment_intent, dict):
-            payment_intent = payment_intent.get("id")
+        payment_intent = _intent_id(data.get("payment_intent"))
         if payment_intent:
-            await billing.mark_refunded(session, provider_payment_id=str(payment_intent))
+            await billing.mark_refunded(
+                session,
+                provider_payment_id=payment_intent,
+                amount_refunded=_as_int(data.get("amount_refunded")),
+                fully_refunded=bool(data.get("refunded", True)),
+                receipt_url=_as_str(data.get("receipt_url")),
+            )
         return {"status": "ok"}
 
     return {"status": "ignored"}
+
+
+def _intent_id(value: object) -> str | None:
+    """Stripe sends an id string, or the whole object when it is expanded."""
+    if isinstance(value, dict):
+        value = value.get("id")
+    return str(value) if value else None
+
+
+def _as_int(value: object) -> int | None:
+    return value if isinstance(value, int) else None
+
+
+def _as_str(value: object) -> str | None:
+    return value if isinstance(value, str) and value else None

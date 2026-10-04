@@ -7,6 +7,7 @@ local path and the production path the same state machine.
 
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -17,6 +18,7 @@ from app.db.models import Film, Payment
 from app.services.catalog import (
     KEEP_FOREVER,
     UNLIMITED_SHOTS,
+    VIDEO_PACK,
     Addon,
     Tier,
     addon_by_id,
@@ -64,6 +66,8 @@ def quote_addon(film: Film, addon: Addon) -> int:
         raise AlreadyPurchased("this film already keeps photos forever")
     if addon.id == UNLIMITED_SHOTS.id and film.unlimited_shots:
         raise AlreadyPurchased("this film already has unlimited shots")
+    if addon.id == VIDEO_PACK.id and film.video_pack:
+        raise AlreadyPurchased("this film already has video clips")
     return addon.amount_cents
 
 
@@ -120,6 +124,10 @@ async def fulfill_session(
     *,
     provider_session_id: str,
     provider_payment_id: str | None = None,
+    total_cents: int | None = None,
+    tax_cents: int = 0,
+    customer_email: str | None = None,
+    receipt_url: str | None = None,
 ) -> Payment:
     """Mark a session paid and grant the entitlement.
 
@@ -142,6 +150,14 @@ async def fulfill_session(
     payment.paid_at = datetime.now(UTC)
     if provider_payment_id:
         payment.provider_payment_id = provider_payment_id
+    # Tax is whatever Stripe assessed at the host's address, not something we
+    # can recompute later, so the webhook body is the only record of it.
+    payment.total_cents = total_cents if total_cents is not None else payment.amount_cents
+    payment.tax_cents = tax_cents
+    if customer_email:
+        payment.customer_email = customer_email
+    if receipt_url:
+        payment.receipt_url = receipt_url
     await session.flush()
     log.info(
         "billing.paid",
@@ -149,6 +165,8 @@ async def fulfill_session(
         session_id=provider_session_id,
         kind=payment.kind,
         amount_cents=payment.amount_cents,
+        total_cents=payment.total_cents,
+        tax_cents=payment.tax_cents,
         entitled_guest_cap=film.entitled_guest_cap,
         keep_forever=film.keep_forever,
     )
@@ -171,15 +189,30 @@ def _grant(film: Film, payment: Payment) -> None:
     if prefix == "addon" and item_id == UNLIMITED_SHOTS.id:
         film.unlimited_shots = True
         return
+    if prefix == "addon" and item_id == VIDEO_PACK.id:
+        film.video_pack = True
+        return
     raise BillingError(f"unknown purchase {payment.kind}")
 
 
-async def mark_refunded(session: AsyncSession, *, provider_payment_id: str) -> Payment | None:
+async def mark_refunded(
+    session: AsyncSession,
+    *,
+    provider_payment_id: str,
+    amount_refunded: int | None = None,
+    fully_refunded: bool = True,
+    receipt_url: str | None = None,
+) -> Payment | None:
     """Record a refund without lowering the cap.
 
     Guests who already joined cannot be un-invited by a chargeback. The host
     ZIP is also always free. A refunded payment is an accounting fact, not a
-    capacity change.
+    capacity change. Revoking the cap mid-event would also collide with the
+    ``guest_cap <= entitled_guest_cap`` check constraint on a film that already
+    filled the seats it paid for.
+
+    Stripe sends this event for partial refunds too, where ``refunded`` is
+    false. Those keep the ``paid`` status and only record the amount returned.
     """
     result = await session.execute(
         select(Payment).where(Payment.provider_payment_id == provider_payment_id)
@@ -187,13 +220,39 @@ async def mark_refunded(session: AsyncSession, *, provider_payment_id: str) -> P
     payment = result.scalar_one_or_none()
     if payment is None:
         return None
-    if payment.status != "refunded":
+
+    charged = payment.total_cents if payment.total_cents is not None else payment.amount_cents
+    returned = amount_refunded if amount_refunded is not None else charged
+    if payment.refunded_cents == returned and (payment.status == "refunded") == fully_refunded:
+        return payment
+
+    payment.refunded_cents = returned
+    payment.refunded_at = datetime.now(UTC)
+    if receipt_url:
+        payment.receipt_url = receipt_url
+    if fully_refunded:
         payment.status = "refunded"
-        await session.flush()
-        log.info(
-            "billing.refunded",
-            film_id=str(payment.film_id),
-            payment_id=str(payment.id),
-            amount_cents=payment.amount_cents,
-        )
+    await session.flush()
+    log.info(
+        "billing.refunded",
+        film_id=str(payment.film_id),
+        payment_id=str(payment.id),
+        amount_cents=payment.amount_cents,
+        refunded_cents=payment.refunded_cents,
+        full=fully_refunded,
+    )
     return payment
+
+
+async def payments_for_film(session: AsyncSession, film_id: uuid.UUID) -> list[Payment]:
+    """Every payment a host has started, newest first.
+
+    Abandoned Checkout sessions stay ``open`` forever and are noise on a
+    receipts page, so they are left out.
+    """
+    result = await session.execute(
+        select(Payment)
+        .where(Payment.film_id == film_id, Payment.status != "open")
+        .order_by(Payment.created_at.desc())
+    )
+    return list(result.scalars().all())

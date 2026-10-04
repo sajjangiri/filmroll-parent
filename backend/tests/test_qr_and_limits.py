@@ -52,8 +52,18 @@ async def test_qr_matches_the_join_url_the_api_reports(
     assert qrcodes.join_url(code) == reported
 
 
+async def test_qr_png_for_the_native_app(client: AsyncClient, future: datetime) -> None:
+    code, _ = await make_film(client, closes_at=future, reveal_at=future)
+
+    response = await client.get(f"/v1/films/{code}/qr.png")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    assert response.content.startswith(b"\x89PNG\r\n\x1a\n")
+
+
 async def test_unknown_film_has_no_qr(client: AsyncClient) -> None:
     assert (await client.get("/v1/films/NOPE99/qr.svg")).status_code == 404
+    assert (await client.get("/v1/films/NOPE99/qr.png")).status_code == 404
 
 
 async def test_reserve_is_rate_limited(

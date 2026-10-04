@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_sessionmaker
 from app.services import films as films_service
-from app.services import tokens
+from app.services import seats, tokens
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -64,17 +64,98 @@ async def require_guest(
     return principal
 
 
-async def require_host(
-    view: FilmDep,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+async def _staff(
+    view: films_service.FilmView,
+    credentials: HTTPAuthorizationCredentials | None,
+    session: AsyncSession,
+    *,
+    allowed: frozenset[str],
 ) -> tokens.Principal:
+    """Shared gate for the film creator, co-hosts, and photographers.
+
+    A seat token names a row that the owner can revoke, so it is re-read here on
+    every request rather than trusted for the year the JWT is valid for.
+    """
     principal = _principal(credentials)
-    if principal.role != "host":
+    if principal.role not in allowed:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "host token required")
     if principal.film_id != view.film.id:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "token is not valid for this film")
+    if principal.role in tokens.SEAT_ROLES:
+        try:
+            await seats.load_active(session, film_id=view.film.id, seat_id=principal.seat_id)
+        except seats.SeatRevoked:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "this access has been removed") from None
+        except seats.SeatError:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "unknown seat") from None
     return principal
 
 
+async def require_host(
+    view: FilmDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    session: DbSession,
+) -> tokens.Principal:
+    """Change the film: moderate, reveal, edit caps, buy. Not a photographer."""
+    return await _staff(view, credentials, session, allowed=tokens.STAFF_WRITE_ROLES)
+
+
+async def require_host_owner(
+    view: FilmDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    session: DbSession,
+) -> tokens.Principal:
+    """The film creator only.
+
+    Guards the things a co-host should not inherit: the owner's email, their
+    receipts, and the ability to hand out further access.
+    """
+    return await _staff(view, credentials, session, allowed=frozenset({"host"}))
+
+
+async def require_film_staff(
+    view: FilmDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+    session: DbSession,
+) -> tokens.Principal:
+    """Read the inbox and pull originals. Includes the photographer."""
+    return await _staff(view, credentials, session, allowed=tokens.STAFF_ROLES)
+
+
+async def require_bearer(
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> tokens.Principal:
+    """A valid token, not yet scoped to a film.
+
+    Only for routes that must run when ``get_film`` would 404 — restoring a
+    deleted film is the one case, since the film is invisible by design.
+    """
+    return _principal(credentials)
+
+
+async def optional_guest(
+    view: FilmDep,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> tokens.Principal | None:
+    """A guest token if one was sent, otherwise anonymous.
+
+    The public gallery stays public. A leftover host token in the browser must
+    not 401 the page, and must not unlock anyone else's shots on a private film.
+    """
+    if credentials is None:
+        return None
+    try:
+        principal = tokens.parse(credentials.credentials)
+    except tokens.TokenError:
+        return None
+    if principal.role != "guest" or principal.film_id != view.film.id:
+        return None
+    return principal
+
+
+OptionalGuest = Annotated[tokens.Principal | None, Depends(optional_guest)]
 GuestPrincipal = Annotated[tokens.Principal, Depends(require_guest)]
+BearerPrincipal = Annotated[tokens.Principal, Depends(require_bearer)]
 HostPrincipal = Annotated[tokens.Principal, Depends(require_host)]
+OwnerPrincipal = Annotated[tokens.Principal, Depends(require_host_owner)]
+StaffPrincipal = Annotated[tokens.Principal, Depends(require_film_staff)]

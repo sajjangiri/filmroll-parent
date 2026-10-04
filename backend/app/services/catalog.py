@@ -44,8 +44,15 @@ TIERS: tuple[Tier, ...] = (
 
 KEEP_FOREVER = Addon("keep_forever", 3_900, "Keep photos forever")
 UNLIMITED_SHOTS = Addon("unlimited_shots", 1_900, "Unlimited shots per guest")
+VIDEO_PACK = Addon("video_pack", 1_900, "Video clips (3 per guest, up to 15 s)")
 
-ADDONS: tuple[Addon, ...] = (KEEP_FOREVER, UNLIMITED_SHOTS)
+ADDONS: tuple[Addon, ...] = (KEEP_FOREVER, UNLIMITED_SHOTS, VIDEO_PACK)
+
+# What the video pack buys. A separate allowance from the photo roll, so a clip
+# never costs a guest one of their photos. The worker trims anything longer than
+# CLIP_MAX_SECONDS, which is the real cap; clients stop recording there too.
+CLIPS_PER_GUEST = 3
+CLIP_MAX_SECONDS = 15
 
 
 class CatalogError(Exception):
@@ -97,3 +104,20 @@ def tier_covering(guest_cap: int) -> Tier:
 
 def paid_tiers() -> tuple[Tier, ...]:
     return tuple(tier for tier in TIERS if tier.amount_cents > 0)
+
+
+def describe_kind(kind: str) -> str:
+    """Human label for a stored ``tier:g50`` / ``addon:keep_forever`` string.
+
+    Falls back to the raw kind rather than raising: a receipt for a tier we have
+    since renamed still has to render on the host's history.
+    """
+    prefix, _, item_id = kind.partition(":")
+    try:
+        if prefix == "tier":
+            return tier_by_id(item_id).label
+        if prefix == "addon":
+            return addon_by_id(item_id).label
+    except CatalogError:
+        return kind
+    return kind

@@ -72,6 +72,8 @@ Important keys:
 | `PUBLIC_WEB_URL` | `http://localhost:3000` | Join URLs and QR codes |
 | `CORS_ORIGINS` | `http://localhost:3000,...` | Browser origins only |
 | `BILLING_FAKE` | `true` | Fake Checkout until `STRIPE_SECRET_KEY` is set |
+| `STRIPE_AUTOMATIC_TAX` | `false` | Stripe Tax; also forces a billing address and VAT number collection |
+| `STRIPE_TAX_BEHAVIOR` | `exclusive` | Whether catalog prices exclude or include tax |
 
 For a **physical phone** on the same wifi, set `S3_PUBLIC_ENDPOINT_URL` to your
 machine's LAN address (see [mobile/README.md](../mobile/README.md) in the parent

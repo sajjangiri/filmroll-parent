@@ -1,4 +1,4 @@
-"""Apple associated-domain files.
+"""Apple associated-domain and Android App Links files.
 
 Served at the well-known URL with application/json and no redirect. An App
 Clip cannot be invoked from a QR until this file is live on the production
@@ -34,6 +34,38 @@ async def apple_app_site_association() -> JSONResponse:
             },
             "appclips": {"apps": [clip_id]},
         },
+        media_type="application/json",
+        headers={"Cache-Control": "public, max-age=3600"},
+    )
+
+
+@router.get("/.well-known/assetlinks.json")
+async def android_asset_links() -> JSONResponse:
+    """Lets Android open ``/f/{code}`` links in the app when it is installed.
+
+    Android checks this once at install time. With no fingerprints configured the
+    list is empty, which verifies nothing and leaves every link on the PWA.
+    """
+    settings = get_settings()
+    fingerprints = [
+        value.strip().upper() for value in settings.android_cert_sha256.split(",") if value.strip()
+    ]
+    statements = (
+        [
+            {
+                "relation": ["delegate_permission/common.handle_all_urls"],
+                "target": {
+                    "namespace": "android_app",
+                    "package_name": settings.android_package,
+                    "sha256_cert_fingerprints": fingerprints,
+                },
+            }
+        ]
+        if fingerprints
+        else []
+    )
+    return JSONResponse(
+        statements,
         media_type="application/json",
         headers={"Cache-Control": "public, max-age=3600"},
     )

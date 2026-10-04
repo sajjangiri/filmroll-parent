@@ -70,9 +70,7 @@ async def test_magic_link_restores_the_host_key(client: AsyncClient, future: dat
     assert recover.status_code == 204
     token = _magic_token()
 
-    session = await client.post(
-        f"/v1/films/{code}/host/session", json={"magic_token": token}
-    )
+    session = await client.post(f"/v1/films/{code}/host/session", json={"magic_token": token})
     assert session.status_code == 200, session.text
     new_host = session.json()["host_token"]
     inbox = await client.get(f"/v1/films/{code}/review", headers=auth(new_host))
@@ -85,18 +83,14 @@ async def test_magic_link_for_the_wrong_film_is_rejected(
     first, host_a = await make_film(
         client, closes_at=future, reveal_at=future, guest_cap=5, title="A"
     )
-    second, _ = await make_film(
-        client, closes_at=future, reveal_at=future, guest_cap=5, title="B"
-    )
+    second, _ = await make_film(client, closes_at=future, reveal_at=future, guest_cap=5, title="B")
     await client.patch(
         f"/v1/films/{first}",
         json={"host_email": "maya@example.com"},
         headers=auth(host_a),
     )
     token = _magic_token()
-    stolen = await client.post(
-        f"/v1/films/{second}/host/session", json={"magic_token": token}
-    )
+    stolen = await client.post(f"/v1/films/{second}/host/session", json={"magic_token": token})
     assert stolen.status_code == 401
 
 
@@ -130,9 +124,7 @@ async def test_unlimited_shots_add_on_lifts_the_roll_limit(
     assert 409 not in statuses
 
 
-async def test_developed_film_notifies_the_host_once(
-    client: AsyncClient, past: datetime
-) -> None:
+async def test_developed_film_notifies_the_host_once(client: AsyncClient, past: datetime) -> None:
     closes = datetime.now(UTC) + timedelta(hours=1)
     code, host = await make_film(client, closes_at=closes, reveal_at=past, guest_cap=5)
     await client.patch(
@@ -150,6 +142,36 @@ async def test_developed_film_notifies_the_host_once(
 
     with session_scope() as session:
         assert notify.notify_developed_films(session) == 0
+
+
+async def test_an_instant_film_does_not_get_a_developed_email(
+    client: AsyncClient, future: datetime
+) -> None:
+    """A live film is born developed. 'Your film is ready' would land at create."""
+    created = await client.post(
+        "/v1/films",
+        json={
+            "title": "Live",
+            "event_type": "party",
+            "closes_at": future.isoformat(),
+            "instant_reveal": True,
+            "shot_limit": 8,
+            "guest_cap": 5,
+        },
+    )
+    assert created.status_code == 201, created.text
+    code = created.json()["film"]["code"]
+    host = created.json()["host_token"]
+    await client.patch(
+        f"/v1/films/{code}",
+        json={"host_email": "maya@example.com"},
+        headers=auth(host),
+    )
+    mail.outbox.clear()
+
+    with session_scope() as session:
+        assert notify.notify_developed_films(session) == 0
+    assert mail.outbox == []
 
 
 async def test_retention_warning_fires_inside_the_30_day_window(

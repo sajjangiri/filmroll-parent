@@ -121,3 +121,91 @@ async def test_reserved_but_uncommitted_shots_stay_out_of_the_gallery(client: As
 
     body = (await client.get(f"/v1/films/{code}/gallery")).json()
     assert body["photos"] == []
+
+
+async def _create_instant(client: AsyncClient, *, closes_at: datetime) -> tuple[str, str]:
+    response = await client.post(
+        "/v1/films",
+        json={
+            "title": "Live Film",
+            "event_type": "party",
+            "closes_at": closes_at.isoformat(),
+            "instant_reveal": True,
+            "shot_limit": 8,
+            "guest_cap": 5,
+        },
+    )
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["film"]["instant_reveal"] is True
+    assert body["film"]["is_developed"] is True
+    return body["film"]["code"], body["host_token"]
+
+
+async def test_an_instant_film_is_born_developed(client: AsyncClient, future: datetime) -> None:
+    """Live mode reuses the existing reveal predicate. No second way to be visible."""
+    code, _ = await _create_instant(client, closes_at=future)
+    film = (await client.get(f"/v1/films/{code}")).json()
+    assert film["instant_reveal"] is True
+    assert film["is_developed"] is True
+
+    gallery = (await client.get(f"/v1/films/{code}/gallery")).json()
+    assert gallery["is_developed"] is True
+    assert gallery["photos"] == []
+
+
+async def test_shots_on_an_instant_film_appear_in_the_gallery_immediately(
+    client: AsyncClient, future: datetime
+) -> None:
+    code, _ = await _create_instant(client, closes_at=future)
+    token = await join(client, code)
+    shot_id = await upload_shot(client, code, token)
+
+    gallery = (await client.get(f"/v1/films/{code}/gallery")).json()
+    assert [photo["shot_id"] for photo in gallery["photos"]] == [shot_id]
+    assert gallery["photos"][0]["url"].startswith("http")
+
+
+async def test_hiding_still_works_on_a_live_film(client: AsyncClient, future: datetime) -> None:
+    """Live is not a way around moderation. A host can still kill a shot."""
+    code, host = await _create_instant(client, closes_at=future)
+    token = await join(client, code)
+    shot_id = await upload_shot(client, code, token)
+
+    hidden = await client.post(f"/v1/films/{code}/shots/{shot_id}/hide", headers=auth(host))
+    assert hidden.status_code == 204
+    assert (await client.get(f"/v1/films/{code}/gallery")).json()["photos"] == []
+
+
+async def test_a_live_film_cannot_grow_a_reveal_time(client: AsyncClient, future: datetime) -> None:
+    """Once guests have seen a photo it cannot be un-seen. Instant is creation-only."""
+    code, host = await _create_instant(client, closes_at=future)
+
+    locked = await client.patch(
+        f"/v1/films/{code}",
+        json={"reveal_at": future.isoformat()},
+        headers=auth(host),
+    )
+    assert locked.status_code == 409
+    assert (await client.get(f"/v1/films/{code}")).json()["is_developed"] is True
+
+
+async def test_a_scheduled_film_still_needs_a_reveal_time(
+    client: AsyncClient, future: datetime
+) -> None:
+    response = await client.post(
+        "/v1/films",
+        json={
+            "title": "Needs a time",
+            "event_type": "wedding",
+            "closes_at": future.isoformat(),
+            "shot_limit": 8,
+            "guest_cap": 5,
+        },
+    )
+    assert response.status_code == 422
+
+
+async def test_instant_reveal_is_off_by_default(client: AsyncClient, future: datetime) -> None:
+    code, _ = await make_film(client, closes_at=future, reveal_at=future)
+    assert (await client.get(f"/v1/films/{code}")).json()["instant_reveal"] is False
