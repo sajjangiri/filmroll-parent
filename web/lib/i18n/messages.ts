@@ -91,6 +91,10 @@ const en = {
   slideshowFullscreen: "Full screen",
   slideshowPaused: "Paused",
   reportFailed: "Could not send that report. Try again.",
+  save: "Save",
+  savePhotoBy: "Save the photo by {name}",
+  saveClipBy: "Save the clip by {name}",
+  saveFailed: "Could not save that. Try again.",
 } as const;
 
 const es: Record<MessageKey, string> = {
@@ -182,6 +186,10 @@ const es: Record<MessageKey, string> = {
   slideshowFullscreen: "Pantalla completa",
   slideshowPaused: "En pausa",
   reportFailed: "No se pudo enviar el reporte. Inténtalo otra vez.",
+  save: "Guardar",
+  savePhotoBy: "Guardar la foto de {name}",
+  saveClipBy: "Guardar el clip de {name}",
+  saveFailed: "No se pudo guardar. Inténtalo otra vez.",
 };
 
 const fr: Record<MessageKey, string> = {
@@ -273,6 +281,10 @@ const fr: Record<MessageKey, string> = {
   slideshowFullscreen: "Plein écran",
   slideshowPaused: "En pause",
   reportFailed: "Impossible d'envoyer le signalement. Réessayez.",
+  save: "Enregistrer",
+  savePhotoBy: "Enregistrer la photo de {name}",
+  saveClipBy: "Enregistrer le clip de {name}",
+  saveFailed: "Impossible d'enregistrer. Réessayez.",
 };
 
 export const messages: Record<Locale, Record<MessageKey, string>> = { en, es, fr };

@@ -7,19 +7,21 @@ description: Filmroll product plan memory — current phase, what is already shi
 
 Do **not** rewrite `ROADMAP.md` or start a new architecture. Clone the Once loop, then add what Once is missing. First public launch is Phases 1–4 (already the sellable web product). Phase 5 is an iPhone acquisition upgrade, not a revenue prerequisite.
 
-## Where we are (2026-09-27)
+## Where we are (2026-10-04)
 
 | Phase | Status | Notes |
 |---|---|---|
 | 0 Prototype | DONE | JSON/`public/uploads` debt cleared in Phase 1 |
 | 1 Foundation | DONE | Postgres, MinIO, signed uploads, idempotent shot ids |
 | 2 PWA guest | DONE | Offline queue, torch, zoom, resumable PUT, WebGL preview, i18n EN/ES/FR, a11y pass |
-| 3 Host tools | DONE | Inbox, hide, PDF cards, ZIP, seats, delete + restore, join PIN, report a photo, instant-reveal, private vs shared, reveal email + guest push. Leftover: none on web; clip ephemeral is Phase 5 |
+| 3 Host tools | DONE | Inbox, hide, PDF cards, ZIP, seats, delete + restore, join PIN, report a photo, instant-reveal, private vs shared, reveal email + guest push, guest save a photo (web share sheet / download, mobile expo-sharing). Leftover: none; clip ephemeral is Phase 5 |
 | 4 Money | DONE | Web Checkout, entitlements, receipts/refunds/VAT, video pack add-on. StoreKit stays Phase 5 |
 | 5 Native iOS | IN PROGRESS | Expo create + host dashboard + guest camera + offline queue + AASA shipped; mobile host tools at web parity except billing. **Do not start the App Clip.** Next: App Store binary — **blocked on the user**: Apple signing team and a public https API/web/storage host (both deferred 2026-09-27). Release config (`buildNumber`, export compliance) is in `app.json`; see `mobile/README.md` → Release build |
 | 6 Android + moat | IN PROGRESS | Android host app, guest video clips, and live slideshow done. Next in order: recap video |
 
-Last slice: Phase 6 live slideshow. `/f/{code}/slideshow` is a full-screen venue wall that polls the public gallery (no token, so hide and the reveal gate carry over). Newest shots nobody has seen yet go up first; then the roll cycles. Photos use `display_url` (1280 px webp); clips play muted and advance on `ended`. Space pauses (and pauses a clip); right arrow skips. Wake Lock keeps a projector laptop awake. A private film shows the join QR and no photos. Opened from the web host dashboard and mobile host Settings.
+Last slice: closed Phase 3 for real with guest "save a photo" on web and mobile. It saves `photo.url` (exactly what the tile shows) through the system share sheet, never a photo-library permission, which is also how the App Clip will have to do it. The production bucket needs CORS GET for the web origin (`backend/README.md`). Event-day observability dashboards (FEATURES §7, Phase 1, P1) are still open.
+
+Before that: Phase 6 live slideshow. `/f/{code}/slideshow` is a full-screen venue wall that polls the public gallery (no token, so hide and the reveal gate carry over). Newest shots nobody has seen yet go up first; then the roll cycles. Photos use `display_url` (1280 px webp); clips play muted and advance on `ended`. Space pauses (and pauses a clip); right arrow skips. Wake Lock keeps a projector laptop awake. A private film shows the join QR and no photos. Opened from the web host dashboard and mobile host Settings.
 
 Before that: Phase 6 guest video clips + Phase 4 video pack. `video_pack` add-on ($19) unlocks `CLIPS_PER_GUEST` (3) clips of up to `CLIP_MAX_SECONDS` (15), a separate allowance from the photo roll (`shots.kind`). Reserve with `kind: "clip"`; commit enqueues `transcode_clip` on the `media` queue (ffmpeg: trim, ≤1280 px, H.264/AAC, metadata stripped, poster webp). Gallery/review/ZIP only include a clip once transcoded (`derivative_at`), and only ever serve the transcode. Web records with MediaRecorder; the Expo app with `expo-camera` `recordAsync` and plays with `expo-video`. The mic permission is requested only on first record (Android `RECORD_AUDIO` is no longer blocked). The transcode test needs ffmpeg: `docker compose run --rm worker-media pytest tests/test_clips.py`.
 

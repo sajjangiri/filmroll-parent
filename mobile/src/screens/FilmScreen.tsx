@@ -25,6 +25,7 @@ import {
 import { LanguagePicker } from "../components/LanguagePicker";
 import { useI18n } from "../i18n/I18nProvider";
 import { registerGuestPush } from "../notifications";
+import { shareMedia } from "../share-media";
 import { CameraScreen } from "./CameraScreen";
 import { ClipTile } from "../components/ClipTile";
 import type { FilmPublic, GalleryPhoto } from "../api/types";
@@ -51,6 +52,7 @@ export function FilmScreen({
   const [joining, setJoining] = useState(false);
   const [photos, setPhotos] = useState<GalleryPhoto[]>([]);
   const [reported, setReported] = useState<Set<string>>(new Set());
+  const [saving, setSaving] = useState<Set<string>>(new Set());
   const hostJoinTried = useRef(false);
   const pushAskedFor = useRef<string | null>(null);
 
@@ -124,6 +126,25 @@ export function FilmScreen({
         return next;
       });
       setError(t("reportFailed"));
+    }
+  }
+
+  async function save(photo: GalleryPhoto) {
+    // A second tap while the download runs would open a second share sheet.
+    if (saving.has(photo.shot_id)) return;
+    setSaving((current) => new Set(current).add(photo.shot_id));
+    setError("");
+    try {
+      await shareMedia(photo, `filmroll-${code}-${photo.shot_id.slice(0, 8)}`);
+    } catch {
+      setError(t("saveFailed"));
+      AccessibilityInfo.announceForAccessibility(t("saveFailed"));
+    } finally {
+      setSaving((current) => {
+        const next = new Set(current);
+        next.delete(photo.shot_id);
+        return next;
+      });
     }
   }
 
@@ -202,6 +223,13 @@ export function FilmScreen({
               {token ? t("privateAlbumOwn") : t("privateAlbum")}
             </Text>
           ) : null}
+          {/* The join form shows its own errors; once it is gone, a failed save
+              or report has to surface here or nobody sees it. */}
+          {error && (token || film.is_closed) ? (
+            <Text style={styles.error} accessibilityRole="alert">
+              {error}
+            </Text>
+          ) : null}
           {photos.length === 0 ? (
             film.shared_gallery ? (
               <Text style={styles.meta}>{t("noPhotosYet")}</Text>
@@ -224,22 +252,38 @@ export function FilmScreen({
                 )}
                 <View style={styles.shotFooter}>
                   <Text style={styles.caption}>{photo.guest_name}</Text>
-                  {token ? (
-                    reported.has(photo.shot_id) ? (
-                      <Text style={styles.reportedLabel}>{t("reported")}</Text>
-                    ) : (
-                      <Pressable
-                        onPress={() => void report(photo.shot_id)}
-                        hitSlop={12}
-                        accessibilityRole="button"
-                        accessibilityLabel={t("reportPhotoBy", {
-                          name: photo.guest_name,
-                        })}
-                      >
-                        <Text style={styles.reportLabel}>{t("report")}</Text>
-                      </Pressable>
-                    )
-                  ) : null}
+                  <View style={styles.shotActions}>
+                    {/* Anyone who can see the photo may keep it. */}
+                    <Pressable
+                      onPress={() => void save(photo)}
+                      disabled={saving.has(photo.shot_id)}
+                      hitSlop={12}
+                      accessibilityRole="button"
+                      accessibilityState={{ busy: saving.has(photo.shot_id) }}
+                      accessibilityLabel={t(
+                        photo.kind === "clip" ? "saveClipBy" : "savePhotoBy",
+                        { name: photo.guest_name },
+                      )}
+                    >
+                      <Text style={styles.actionLabel}>{t("save")}</Text>
+                    </Pressable>
+                    {token ? (
+                      reported.has(photo.shot_id) ? (
+                        <Text style={styles.reportedLabel}>{t("reported")}</Text>
+                      ) : (
+                        <Pressable
+                          onPress={() => void report(photo.shot_id)}
+                          hitSlop={12}
+                          accessibilityRole="button"
+                          accessibilityLabel={t("reportPhotoBy", {
+                            name: photo.guest_name,
+                          })}
+                        >
+                          <Text style={styles.reportLabel}>{t("report")}</Text>
+                        </Pressable>
+                      )
+                    ) : null}
+                  </View>
                 </View>
               </View>
             ))
@@ -392,6 +436,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
+  shotActions: { flexDirection: "row", alignItems: "center", gap: 20 },
+  actionLabel: { color: "#fff", fontSize: 13 },
   reportLabel: { color: "#a1a1aa", fontSize: 13 },
   reportedLabel: { color: "#71717a", fontSize: 13 },
   primary: {

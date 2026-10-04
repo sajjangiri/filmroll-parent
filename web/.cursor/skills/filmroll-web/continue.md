@@ -22,7 +22,9 @@ Deleting a film puts the dashboard in a state no fetch can describe: the film 40
 
 The gallery is public but reporting is not: the report control renders only when `loadGuestToken(code)` returns something, so a link-holder who never joined cannot flag photos. The host inbox floats reported-and-still-visible shots to the top and rings them amber, because that is the only thing in the inbox actually waiting on a decision.
 
-If the user says continue and is in `web/`, Phase 3 leftovers on this surface are done. Guest "save a photo" is the remaining Phase 3 P1 in `FEATURES.md` if they stay here; otherwise mobile host parity (seats, delete, PIN).
+If the user says continue and is in `web/`, Phase 3 is closed on this surface, including the guest "save a photo" P1.
+
+Saving a photo: each gallery tile has Save (and Report, for a guest token) in a row *under* the tile, because two 44px controls and a name do not fit across a phone's half-width column. `saveMedia` fetches `photo.url` (what the tile shows; a clip's transcode) into a `File`, offers it to `navigator.share({ files })` so iOS shows "Save Image", and falls back to an object-URL download on desktop or when Safari refuses share after a slow fetch. A cross-origin `<a download>` is ignored, which is why the fetch exists, and why the production bucket needs CORS **GET** for the web origin. If the fetch itself fails it opens the URL so long-press still works.
 
 Guest clips: when `film.video_pack` is set, `Camera` shows a Photo / Clip switch. Clip mode records the **raw** camera track plus a microphone stream requested on first record (never with the camera), auto-stopping at `film.clip_max_seconds`. A video blob goes through the same IndexedDB queue; `captureShot` reserves it as `kind: "clip"` and PUTs with the `content_type` the reserve response echoes (browsers append codec parameters the signature would not match). `ClipTile` pins the first signed URL so the 8 s gallery poll does not restart playback. The host buys the pack from the dashboard's add-on list.
 

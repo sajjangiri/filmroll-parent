@@ -79,6 +79,11 @@ For a **physical phone** on the same wifi, set `S3_PUBLIC_ENDPOINT_URL` to your
 machine's LAN address (see [mobile/README.md](../mobile/README.md) in the parent
 repo, or the parent README).
 
+In production the S3/R2 bucket needs a CORS rule for the web origin
+(`PUBLIC_WEB_URL`) allowing **PUT** (guest uploads) and **GET** (a guest saving a
+photo fetches the signed URL so the share sheet gets a file). `CORS_ORIGINS` only
+covers the API. Local MinIO already answers any origin.
+
 After editing `.env`, restart the stack so workers pick up new values:
 
 ```bash

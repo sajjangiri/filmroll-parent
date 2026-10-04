@@ -28,6 +28,8 @@ The PIN is digits only (4–8). Adding one mid-event never locks out a guest who
 
 **Guest clips:** with the film's video pack (bought on the web), `CameraScreen` shows a Photo / Clip switch; clip mode sets `CameraView mode="video"` and calls `recordAsync({ maxDuration })`. The microphone is requested from the record button only (`useMicrophonePermissions({ request: false })`), so photo-only guests never see that prompt; `app.json` therefore no longer blocks `RECORD_AUDIO`. Queue rows carry `kind` and keep the file extension, which is how `clipContentType` knows iOS `.mov` from Android `.mp4`. `ClipTile` shows the poster and opens an `expo-video` player in a modal, so a long gallery never holds dozens of players. `expo-video` is native: rebuild both platforms after pulling, and re-check the `RuntimeScheduler.h` patch after any install.
 
+**Saving a photo:** the gallery footer has Save beside Report. `shareMedia` (`src/share-media.ts`) downloads `photo.url` into the cache and hands it to `expo-sharing`, so iOS offers "Save Image" and Android its targets, with no photo-library permission. That is also the only route an App Clip will have. RN `Share` cannot send a file on Android. `expo-sharing` is native: rebuild both platforms after pulling. Errors in the gallery render under the section title, since the join form (which used to own `error`) is gone once a guest has joined.
+
 **Venue slideshow:** the wall itself is a web page. Settings → Open slideshow launches `${WEB_URL}/f/{code}/slideshow` when the gallery is shared; a private film explains why the wall is off.
 
 **Next (still this app, not an App Clip):**

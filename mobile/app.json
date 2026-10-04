@@ -77,7 +77,8 @@
           "enableBackgroundRemoteNotifications": false
         }
       ],
-      "expo-video"
+      "expo-video",
+      "expo-sharing"
     ]
   }
 }

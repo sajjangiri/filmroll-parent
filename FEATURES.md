@@ -73,7 +73,7 @@ Legend:
 | **Signed URLs that 403 before reveal** | done | 1 | P0 | api |
 | Thumbnail / display derivatives | done | 1 | P0 | api |
 | Bulk ZIP of originals | done | 3 | P1 | web, ios |
-| Guest saves a single photo | todo | 3 | P1 | web, ios |
+| Guest saves a single photo | done | 3 | P1 | web, ios, android |
 | Reveal notification (email / push) | done | 3 | P1 | web, ios |
 | Ephemeral reveal notification (8h/24h) | todo | 5 | P2 | clip |
 | Live slideshow for a venue screen | done | 6 | P2 | web |
