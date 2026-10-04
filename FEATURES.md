@@ -42,7 +42,7 @@ Legend:
 | Optional PIN on the film | done | 3 | P1 | api, web, ios |
 | Geo or time-window lock | todo | 6 | P2 | api |
 | Guest list import (CSV) | todo | 6 | P2 | web |
-| Smart App Banner offering the iOS app | todo | 5 | P1 | web |
+| Smart App Banner offering the iOS app | done | 5 | P1 | web |
 
 ## 3. Camera + capture
 
@@ -88,8 +88,8 @@ Legend:
 | Durable host auth (magic link / Apple) | done | 1 | P0 | web, ios |
 | **One-tap hide / moderation queue** | done | 3 | P0 | web, ios |
 | Hidden photos never fan out | done | 3 | P0 | api |
-| Co-hosts | done | 3 | P1 | web |
-| Photographer read-only seat | done | 3 | P2 | web |
+| Co-hosts | done | 3 | P1 | web, ios, android |
+| Photographer read-only seat | done | 3 | P2 | web, ios, android |
 | Guest deletes own photo | done | 3 | P1 | api |
 | Private vs shared visibility | done | 3 | P1 | web, ios |
 | Report a photo | done | 3 | P1 | web, ios |
@@ -106,7 +106,7 @@ Legend:
 | Upgrade cap mid-event | done | 4 | P1 | web, ios |
 | StoreKit 2 IAP (full app only) | todo | 5 | P1 | ios |
 | Unlimited-shots add-on | done | 4 | P1 | web, ios |
-| Video pack add-on | done | 6 | P2 | web (bought), ios/android (used) |
+| Video pack add-on | done | 4 | P2 | web (bought), ios/android (used) |
 | Receipts, refunds, VAT/tax | done | 4 | P1 | web, api |
 | Keep-forever storage after 12 months | done | 4 | P1 | web |
 | Photobook / prints | todo | 6 | P2 | web |
@@ -126,7 +126,8 @@ Legend:
 | i18n (EN, ES, FR) | done | 2 | P1 | web, ios |
 | Accessibility pass (guest flow) | done | 2 | P1 | web, ios |
 | Event-day observability dashboards | todo | 1 | P1 | api |
-| Associated domains + AASA | todo | 5 | P1 | api |
+| AASA + assetlinks + `applinks:` entitlement | done | 5 | P1 | api, ios, android |
+| App Clip `appclips:` entitlement | todo | 5 | P1 | clip |
 | Android host app | done | 6 | P2 | android |
 
 ---
