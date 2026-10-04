@@ -12,12 +12,20 @@ import type {
   CommitResponse,
   ExportResponse,
   FilmCreated,
+  FilmDeleted,
   FilmPublic,
   GalleryResponse,
   HostAccount,
   JoinResponse,
+  PaymentsResponse,
+  ReportReason,
+  ReportResponse,
   ReserveResponse,
   ReviewResponse,
+  SeatClaimed,
+  SeatCreated,
+  SeatsResponse,
+  StaffRole,
 } from "@/lib/types";
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -70,6 +78,8 @@ async function request<T>(
 
 const guestKey = (code: string) => `filmroll-guest-${code}`;
 const hostKey = (code: string) => `filmroll-host-${code}`;
+const roleKey = (code: string) => `filmroll-role-${code}`;
+const deletedKey = (code: string) => `filmroll-deleted-${code}`;
 
 export function saveGuestToken(code: string, token: string): void {
   window.localStorage.setItem(guestKey(code), token);
@@ -91,13 +101,47 @@ export function loadHostToken(code: string): string | null {
   return window.localStorage.getItem(hostKey(code));
 }
 
+// Which seat this device holds. The API enforces the boundary either way; this
+// only decides which controls are worth rendering.
+export function saveStaffRole(code: string, role: StaffRole): void {
+  window.localStorage.setItem(roleKey(code), role);
+}
+
+export function loadStaffRole(code: string): StaffRole {
+  const saved = window.localStorage.getItem(roleKey(code));
+  return saved === "cohost" || saved === "photographer" ? saved : "host";
+}
+
+// A deleted film is a 404 to every request, so the dashboard has no way to
+// learn that a restore is still possible. This is the note the deleting device
+// leaves itself; the API is what actually enforces the deadline.
+export function saveDeleted(code: string, deleted: FilmDeleted): void {
+  window.localStorage.setItem(deletedKey(code), JSON.stringify(deleted));
+}
+
+export function loadDeleted(code: string): FilmDeleted | null {
+  const raw = window.localStorage.getItem(deletedKey(code));
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as FilmDeleted;
+  } catch {
+    return null;
+  }
+}
+
+export function clearDeleted(code: string): void {
+  window.localStorage.removeItem(deletedKey(code));
+}
+
 // ------------------------------------------------------------------- endpoints
 
 export function createFilm(input: {
   title: string;
   event_type: string;
   closes_at: string;
-  reveal_at: string;
+  reveal_at?: string | null;
+  instant_reveal?: boolean;
+  shared_gallery?: boolean;
   shot_limit: number;
   guest_cap: number;
   host_email?: string;
@@ -112,15 +156,49 @@ export function getFilm(code: string): Promise<FilmPublic> {
   return request<FilmPublic>(`/v1/films/${code}`);
 }
 
-export function joinFilm(code: string, displayName: string): Promise<JoinResponse> {
+export function joinFilm(
+  code: string,
+  displayName: string,
+  joinPin?: string,
+): Promise<JoinResponse> {
   return request<JoinResponse>(`/v1/films/${code}/join`, {
     method: "POST",
-    body: JSON.stringify({ display_name: displayName }),
+    body: JSON.stringify({ display_name: displayName, join_pin: joinPin ?? null }),
   });
 }
 
-export function getGallery(code: string): Promise<GalleryResponse> {
-  return request<GalleryResponse>(`/v1/films/${code}/gallery`);
+export function setJoinPin(code: string, hostToken: string, pin: string): Promise<FilmPublic> {
+  return request<FilmPublic>(`/v1/films/${code}/pin`, {
+    method: "PUT",
+    token: hostToken,
+    body: JSON.stringify({ pin }),
+  });
+}
+
+export function clearJoinPin(code: string, hostToken: string): Promise<FilmPublic> {
+  return request<FilmPublic>(`/v1/films/${code}/pin`, {
+    method: "DELETE",
+    token: hostToken,
+  });
+}
+
+export function getGallery(code: string, guestToken?: string | null): Promise<GalleryResponse> {
+  return request<GalleryResponse>(`/v1/films/${code}/gallery`, {
+    token: guestToken ?? undefined,
+  });
+}
+
+export function reportShot(
+  code: string,
+  shotId: string,
+  guestToken: string,
+  reason: ReportReason,
+): Promise<ReportResponse> {
+  return request<ReportResponse>(`/v1/films/${code}/shots/${shotId}/report`, {
+    method: "POST",
+    token: guestToken,
+    body: JSON.stringify({ reason }),
+  });
 }
 
 export function revealFilm(code: string, hostToken: string): Promise<FilmPublic> {
@@ -165,6 +243,7 @@ export function updateFilm(
     shot_limit?: number;
     guest_cap?: number;
     host_email?: string;
+    shared_gallery?: boolean;
   },
 ): Promise<FilmPublic> {
   return request<FilmPublic>(`/v1/films/${code}`, {
@@ -209,6 +288,54 @@ export function getHostAccount(code: string, hostToken: string): Promise<HostAcc
   return request<HostAccount>(`/v1/films/${code}/host/account`, { token: hostToken });
 }
 
+export function getPayments(code: string, hostToken: string): Promise<PaymentsResponse> {
+  return request<PaymentsResponse>(`/v1/films/${code}/payments`, { token: hostToken });
+}
+
+export function deleteFilm(code: string, hostToken: string): Promise<FilmDeleted> {
+  return request<FilmDeleted>(`/v1/films/${code}`, {
+    method: "DELETE",
+    token: hostToken,
+  });
+}
+
+export function restoreFilm(code: string, hostToken: string): Promise<FilmPublic> {
+  return request<FilmPublic>(`/v1/films/${code}/restore`, {
+    method: "POST",
+    token: hostToken,
+  });
+}
+
+export function listSeats(code: string, hostToken: string): Promise<SeatsResponse> {
+  return request<SeatsResponse>(`/v1/films/${code}/seats`, { token: hostToken });
+}
+
+export function createSeat(
+  code: string,
+  hostToken: string,
+  body: { role: Exclude<StaffRole, "host">; label: string },
+): Promise<SeatCreated> {
+  return request<SeatCreated>(`/v1/films/${code}/seats`, {
+    method: "POST",
+    token: hostToken,
+    body: JSON.stringify(body),
+  });
+}
+
+export function revokeSeat(code: string, seatId: string, hostToken: string): Promise<void> {
+  return request<void>(`/v1/films/${code}/seats/${seatId}`, {
+    method: "DELETE",
+    token: hostToken,
+  });
+}
+
+export function claimSeat(code: string, inviteToken: string): Promise<SeatClaimed> {
+  return request<SeatClaimed>(`/v1/films/${code}/seats/claim`, {
+    method: "POST",
+    body: JSON.stringify({ invite_token: inviteToken }),
+  });
+}
+
 export function recoverHost(code: string, email: string): Promise<void> {
   return request<void>(`/v1/films/${code}/host/recover`, {
     method: "POST",
@@ -229,11 +356,17 @@ function reserveShot(
   code: string,
   token: string,
   shotId: string,
+  media: Blob,
 ): Promise<ReserveResponse> {
+  const clip = media.type.startsWith("video/");
   return request<ReserveResponse>(`/v1/films/${code}/shots/reserve`, {
     method: "POST",
     token,
-    body: JSON.stringify({ shot_id: shotId, content_type: "image/jpeg" }),
+    body: JSON.stringify({
+      shot_id: shotId,
+      kind: clip ? "clip" : "photo",
+      content_type: clip ? media.type : "image/jpeg",
+    }),
   });
 }
 
@@ -251,7 +384,8 @@ function commitShot(
 const UPLOAD_ATTEMPTS = 3;
 
 /**
- * Reserve a slot, put the bytes in storage, then confirm.
+ * Reserve a slot, put the bytes in storage, then confirm. A video blob is
+ * reserved as a clip, which draws on its own allowance.
  *
  * The shot id is generated here and reused across every retry. That is what
  * makes the whole sequence idempotent: a guest on bad venue wifi can fail and
@@ -263,15 +397,16 @@ export async function captureShot(
   photo: Blob,
   shotId: string = crypto.randomUUID(),
 ): Promise<CommitResponse> {
-  const reserved = await reserveShot(code, token, shotId);
-
   let lastError: unknown;
   for (let attempt = 1; attempt <= UPLOAD_ATTEMPTS; attempt += 1) {
     try {
+      // Re-reserve each attempt so a slow or dropped PUT gets a fresh presigned URL
+      // without burning a second slot (same client shot id).
+      const reserved = await reserveShot(code, token, shotId, photo);
       const upload = await fetch(reserved.upload_url, {
         method: "PUT",
         body: photo,
-        headers: { "Content-Type": "image/jpeg" },
+        headers: { "Content-Type": reserved.content_type },
       });
       if (!upload.ok) {
         throw new ApiError(upload.status, `Upload failed (${upload.status})`);

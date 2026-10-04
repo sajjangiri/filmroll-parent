@@ -17,9 +17,10 @@ app/                         # routes only
   f/[code]/page.tsx          # guest join + camera
   f/[code]/host/page.tsx     # host inbox
   f/[code]/gallery/page.tsx
+  f/[code]/slideshow/page.tsx
   f/[code]/print/page.tsx
 components/
-  guest/                     # Camera, GuestApp, Gallery, InstallHint
+  guest/                     # Camera, GuestApp, Gallery, Slideshow, InstallHint
   host/                      # CreateFilmForm, HostDashboard, PrintCards
   pwa/                       # RegisterServiceWorker
 lib/                         # api client, types, IndexedDB upload queue
@@ -36,6 +37,7 @@ Do not put API routes in Next that proxy photo bytes. The browser talks to FastA
 - Guest token: `localStorage` key `filmroll-guest-{code}`. Host token: `filmroll-host-{code}`.
 - Public `FilmPublic` never includes host email.
 - Gallery photos are empty until developed; do not invent client-side reveal.
+- A private gallery still develops; pass the guest token to `getGallery`. Host tokens must not be sent — they unlock nothing.
 - Billing: Stripe Checkout on web. PATCH must not raise `guest_cap` above entitlement; 402 means pay.
 
 ## Patterns
@@ -54,7 +56,7 @@ Do not put API routes in Next that proxy photo bytes. The browser talks to FastA
 
 - Start an App Clip or Smart App Banner without a real App Store id.
 - Route uploads through Next.js.
-- Bake a filter into the stored original (preview only, later WebGL work).
+- Bake a filter into the stored original (WebGL preview on web is display-only).
 - Add StoreKit.
 
 Details: [structure.md](structure.md)

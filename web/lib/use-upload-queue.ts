@@ -8,6 +8,7 @@ import {
   getServerQueueSnapshot,
   isAuthError,
   isCapError,
+  isClipCapError,
   isClosedError,
   onShotFailed,
   onShotUploaded,
@@ -19,6 +20,7 @@ import {
 type Options = {
   token: string;
   onRemainingChange: (remaining: number) => void;
+  onClipsRemainingChange: (remaining: number) => void;
   onUnauthorized: () => void;
   onClosed: () => void;
 };
@@ -45,9 +47,10 @@ export function useUploadQueue(code: string, options: Options) {
     window.addEventListener("online", resume);
     document.addEventListener("visibilitychange", resume);
 
-    const offUploaded = onShotUploaded((shot, remaining) => {
+    const offUploaded = onShotUploaded((shot, committed) => {
       if (shot.code !== code) return;
-      optionsRef.current.onRemainingChange(remaining);
+      optionsRef.current.onRemainingChange(committed.shots_remaining);
+      optionsRef.current.onClipsRemainingChange(committed.clips_remaining);
     });
 
     const offFailed = onShotFailed((shot, error) => {
@@ -55,6 +58,7 @@ export function useUploadQueue(code: string, options: Options) {
       if (isAuthError(error)) optionsRef.current.onUnauthorized();
       if (isClosedError(error)) optionsRef.current.onClosed();
       if (isCapError(error)) optionsRef.current.onRemainingChange(0);
+      if (isClipCapError(error)) optionsRef.current.onClipsRemainingChange(0);
     });
 
     return () => {
@@ -72,5 +76,12 @@ export function useUploadQueue(code: string, options: Options) {
     [code],
   );
 
-  return { snapshot, enqueue, waiting: snapshot.pending + snapshot.uploading };
+  const waiting = snapshot.pending + snapshot.uploading;
+  return {
+    snapshot,
+    enqueue,
+    waiting,
+    photosWaiting: waiting - snapshot.clipsWaiting,
+    clipsWaiting: snapshot.clipsWaiting,
+  };
 }

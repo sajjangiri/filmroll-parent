@@ -3,7 +3,7 @@
 | Path | Owns |
 |---|---|
 | `app/` | App Router pages, layout, manifest, icons. No business logic. |
-| `components/guest/` | Join, camera, gallery, install hint |
+| `components/guest/` | Join, camera, gallery, slideshow, install hint |
 | `components/host/` | Create, dashboard, print cards |
 | `components/pwa/` | Service worker registration |
 | `lib/api.ts` | FastAPI client, tokens, reserve/commit/checkout |
@@ -18,4 +18,5 @@ Routes:
 - `/f/{code}` guest
 - `/f/{code}/host` moderate (photos before public gallery)
 - `/f/{code}/gallery` after develop
+- `/f/{code}/slideshow` venue wall (public gallery only)
 - `/f/{code}/print` table cards

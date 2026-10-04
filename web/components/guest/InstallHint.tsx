@@ -2,6 +2,8 @@
 
 import { useSyncExternalStore } from "react";
 
+import { useI18n } from "@/components/guest/I18nProvider";
+
 const neverChanges = () => () => {};
 
 function readShouldShow(): boolean {
@@ -11,13 +13,9 @@ function readShouldShow(): boolean {
 }
 
 export function InstallHint() {
+  const { t } = useI18n();
   const show = useSyncExternalStore(neverChanges, readShouldShow, () => false);
   if (!show) return null;
 
-  return (
-    <p className="text-xs text-zinc-500">
-      Add to Home Screen from the share menu to keep shooting if the browser tab
-      is closed.
-    </p>
-  );
+  return <p className="text-sm text-zinc-400">{t("installHint")}</p>;
 }

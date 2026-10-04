@@ -2,13 +2,15 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { createFilm, saveHostToken } from "@/lib/api";
+import { createFilm, saveHostToken, saveStaffRole } from "@/lib/api";
 
 export function CreateFilmForm() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [hoursOpen, setHoursOpen] = useState(24);
   const [revealHours, setRevealHours] = useState(24);
+  const [instantReveal, setInstantReveal] = useState(false);
+  const [sharedGallery, setSharedGallery] = useState(true);
   const [shotLimit, setShotLimit] = useState(8);
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
@@ -27,15 +29,19 @@ export function CreateFilmForm() {
         title: title.trim() || "Untitled film",
         event_type: "party",
         closes_at: new Date(now + hoursOpen * 3_600_000).toISOString(),
-        reveal_at: new Date(now + revealHours * 3_600_000).toISOString(),
+        ...(instantReveal
+          ? { instant_reveal: true }
+          : { reveal_at: new Date(now + revealHours * 3_600_000).toISOString() }),
         shot_limit: shotLimit,
         guest_cap: 5,
+        shared_gallery: sharedGallery,
         ...(email.trim() ? { host_email: email.trim() } : {}),
       });
 
       // The only copy of this token. Losing it means losing host control, which
       // is the trade for hosts not having accounts.
       saveHostToken(created.film.code, created.host_token);
+      saveStaffRole(created.film.code, "host");
       router.push(`/f/${created.film.code}/host`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not create film");
@@ -66,17 +72,24 @@ export function CreateFilmForm() {
             className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-500"
           />
         </label>
-        <label className="flex flex-col gap-2">
-          <span className="text-sm text-zinc-400">Reveal after (hours)</span>
-          <input
-            type="number"
-            min={0}
-            max={336}
-            value={revealHours}
-            onChange={(e) => setRevealHours(Number(e.target.value))}
-            className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-500"
-          />
-        </label>
+        {instantReveal ? (
+          <p className="self-end pb-2 text-sm text-zinc-400">
+            Photos appear in the gallery as they are taken. This cannot be
+            undone later.
+          </p>
+        ) : (
+          <label className="flex flex-col gap-2">
+            <span className="text-sm text-zinc-400">Reveal after (hours)</span>
+            <input
+              type="number"
+              min={0}
+              max={336}
+              value={revealHours}
+              onChange={(e) => setRevealHours(Number(e.target.value))}
+              className="rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-500"
+            />
+          </label>
+        )}
         <label className="flex flex-col gap-2">
           <span className="text-sm text-zinc-400">Shots per guest</span>
           <input
@@ -89,6 +102,31 @@ export function CreateFilmForm() {
           />
         </label>
       </div>
+      <label className="flex items-start gap-3 text-sm text-zinc-300">
+        <input
+          type="checkbox"
+          checked={instantReveal}
+          onChange={(e) => setInstantReveal(e.target.checked)}
+          className="mt-1 h-4 w-4 accent-white"
+        />
+        <span>
+          Show photos as they are taken, instead of waiting to develop. Guests
+          cannot un-see a shot, so this stays on for the life of the film.
+        </span>
+      </label>
+      <label className="flex items-start gap-3 text-sm text-zinc-300">
+        <input
+          type="checkbox"
+          checked={!sharedGallery}
+          onChange={(e) => setSharedGallery(!e.target.checked)}
+          className="mt-1 h-4 w-4 accent-white"
+        />
+        <span>
+          Only each guest sees their own photos. You still get every shot in
+          the host inbox and the ZIP. Unlike live reveal, you can change this
+          later.
+        </span>
+      </label>
       <label className="flex flex-col gap-2">
         <span className="text-sm text-zinc-400">Your email (optional)</span>
         <input

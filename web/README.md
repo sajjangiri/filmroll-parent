@@ -39,6 +39,8 @@ Open http://localhost:3000
 | Variable | Default | Purpose |
 |----------|---------|---------|
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | FastAPI base URL (browser calls this directly) |
+| `NEXT_PUBLIC_IOS_APP_STORE_ID` | unset | When set, guest film pages show the iOS Smart App Banner |
+| `NEXT_PUBLIC_WEB_URL` | `https://filmroll.app` | Used in the banner's `app-argument` deep link |
 
 Nothing is proxied through Next.js. Guest capture is reserve → presigned PUT →
 commit, same contract as the Expo app.
@@ -87,6 +89,28 @@ Why three files? The API signs upload URLs with `S3_PUBLIC_ENDPOINT_URL`. If tha
 still says `localhost`, the phone PUTs to itself and every shot fails after
 join.
 
+## App flow
+
+### Host path
+
+1. Open `/` — landing page with the create form (`CreateFilmForm`)
+2. Submit — API creates the film, returns a one-time `host_token`
+3. Browser saves the token via `saveHostToken(code, token)` in localStorage
+4. Redirect to `/f/{code}/host` — dashboard with QR, film code, join link, moderation, billing
+
+The host token lives only in this browser's storage. Losing it means losing host
+control unless you saved a recovery email.
+
+### Guest path
+
+1. Open `/f/{code}` — join screen, enter a display name
+2. API returns a guest JWT scoped to this film
+3. Camera — reserve slot → presigned PUT to MinIO → commit
+4. After reveal: `/f/{code}/gallery`
+
+Scanning the host QR lands guests on `/f/{code}` in the browser (PWA), not in the
+Expo app.
+
 ## Layout
 
 ```
@@ -114,4 +138,4 @@ Read before changing code:
 - `.cursor/skills/filmroll-web/SKILL.md`
 - `.cursor/skills/filmroll-web/continue.md`
 
-Mobile guest camera and App Clip are separate repos; hosts stay on the web.
+Mobile app (host create + guest camera) and App Clip are separate from this repo's Next.js surface. Web remains the full host dashboard and Stripe Checkout.

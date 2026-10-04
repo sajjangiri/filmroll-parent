@@ -16,6 +16,7 @@ import {
   captureShot,
   isRetryableUploadError,
 } from "@/lib/api";
+import type { CommitResponse } from "@/lib/types";
 
 const DB_NAME = "filmroll";
 const STORE = "queued-shots";
@@ -25,6 +26,7 @@ export type QueuedShot = {
   shotId: string;
   code: string;
   token: string;
+  /** A photo, or a clip when the blob is video/*. */
   photo: Blob;
   createdAt: number;
   status: "pending" | "uploading" | "failed";
@@ -36,13 +38,20 @@ export type QueueSnapshot = {
   pending: number;
   uploading: number;
   failed: number;
+  /** Of pending + uploading, how many are clips. They spend a separate allowance. */
+  clipsWaiting: number;
 };
 
 export const EMPTY_SNAPSHOT: QueueSnapshot = {
   pending: 0,
   uploading: 0,
   failed: 0,
+  clipsWaiting: 0,
 };
+
+export function isClipBlob(blob: Blob): boolean {
+  return blob.type.startsWith("video/");
+}
 
 type Listener = () => void;
 
@@ -124,11 +133,12 @@ async function deleteShot(shotId: string): Promise<void> {
 }
 
 function countSnapshot(shots: QueuedShot[]): QueueSnapshot {
-  const snapshot: QueueSnapshot = { pending: 0, uploading: 0, failed: 0 };
+  const snapshot: QueueSnapshot = { pending: 0, uploading: 0, failed: 0, clipsWaiting: 0 };
   for (const shot of shots) {
     if (shot.status === "pending") snapshot.pending += 1;
     else if (shot.status === "uploading") snapshot.uploading += 1;
     else snapshot.failed += 1;
+    if (shot.status !== "failed" && isClipBlob(shot.photo)) snapshot.clipsWaiting += 1;
   }
   return snapshot;
 }
@@ -203,7 +213,7 @@ async function uploadOne(shot: QueuedShot): Promise<void> {
   try {
     const committed = await captureShot(shot.code, shot.token, shot.photo, shot.shotId);
     await deleteShot(shot.shotId);
-    listenersForSuccess.forEach((fn) => fn(shot, committed.shots_remaining));
+    listenersForSuccess.forEach((fn) => fn(shot, committed));
   } catch (error) {
     if (isRetryableUploadError(error) && shot.attempts < 8) {
       shot.status = "pending";
@@ -221,7 +231,7 @@ async function uploadOne(shot: QueuedShot): Promise<void> {
   }
 }
 
-type ShotListener = (shot: QueuedShot, remaining: number) => void;
+type ShotListener = (shot: QueuedShot, committed: CommitResponse) => void;
 type FailListener = (shot: QueuedShot, error: unknown) => void;
 
 const listenersForSuccess = new Set<ShotListener>();
@@ -243,6 +253,10 @@ export function onShotFailed(listener: FailListener): () => void {
 
 export function isCapError(error: unknown): boolean {
   return error instanceof ApiError && error.status === 409 && /every shot/i.test(error.message);
+}
+
+export function isClipCapError(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 409 && /every clip/i.test(error.message);
 }
 
 export function isClosedError(error: unknown): boolean {
