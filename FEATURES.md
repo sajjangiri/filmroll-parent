@@ -122,7 +122,7 @@ Legend:
 | Keep-forever storage after 12 months | done | 4 | P1 | web |
 | Photobook / prints | todo | 6 | P2 | web |
 | Planner / venue license, invoicing | todo | 6 | P2 | web |
-| Brand pack: logo + colour on guest screens, optional logo on photos, versioned photo terms at join, usage manifest in the ZIP, event stats (placeholder price $49 / Rs 6,500) | done | 6 | P2 | api, web (bought + edited), ios/android (logo + terms at join; host row links to web) |
+| Brand pack: logo + colour on guest screens, optional logo on photos, versioned photo terms at join, usage manifest in the ZIP, event stats (placeholder price $49 / Rs 6,500) | done | 6 | P2 | api, web (bought + edited), ios/android (colour + logo on guest screens, terms at join; host row links to web) |
 
 ## 7. Platform / infrastructure
 
