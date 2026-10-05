@@ -210,9 +210,11 @@ Charge for **capacity and artifacts**, never per shutter press.
 - [x] Month-11 retention email
 - [ ] Local payment methods for Nepal (user requirement, 2026-10-05). Stripe does not
       onboard businesses based in Nepal, so a Nepal-run Filmroll cannot take money through
-      the current Checkout at all. Likely Khalti and/or eSewa as a second provider on the
-      same `payments` table, with an NPR price ladder. Waiting on a short design, the
-      merchant accounts and NPR prices from the user
+      the current Checkout at all. **Khalti built (2026-10-05)** as a second provider on the
+      same `payments` table: rupee checkout from the dashboard's "Pay with" choice, confirmed
+      by Khalti's lookup (never the return URL), a beat job for hosts who close the tab, fake
+      mode locally. Still open: the user's Khalti merchant account and keys (sandbox, then
+      live), real NPR prices (the rupee column is a placeholder), and eSewa if wanted
 
 **Why web-first billing:** Stripe on the web keeps ~97% of the price. Apple IAP takes
 15–30%. Selling the event on web and treating the app as the camera is the single
@@ -276,9 +278,26 @@ App Store download, and the same QR on Android opens the PWA.
       camera closes until the album opens. Clients re-encode the pick (GPS and all EXIF
       gone, longest edge 4096 px) and send the photo's own date for the stamp. The host
       inbox marks them. Not in the App Clip (no photo-library access there)
-- [ ] Multiple rolls per event (ceremony / cocktail / dance floor)
+- [x] Multiple rolls per event (2026-10-05; Once has no such thing, its workaround is a
+      second film, while GuestCam and GuestPix sell separate galleries): a host splits a
+      film into up to six timed rolls (ceremony, party) with their own shot allowance,
+      under one QR, one guest list, one price and one reveal. Rolls never overlap; the
+      camera rests between them; a camera-roll photo joins the roll it was taken in; the
+      album has a tab per roll and the ZIP a folder per roll. A film nobody splits is
+      unchanged (no roll rows, null `roll_id`). Rolls are edited on the web; the app shows
+      them and links there
 - [ ] Photobook + print partner
-- [ ] Brand event pack: rights checkbox, usage export, analytics
+- [x] Brand event pack (2026-10-05, taken before the photobook because it needs no print
+      partner; Once added "Branding customization for films" in app 1.7.13 and sells photo
+      terms and consent flows only as custom Business plans through its sales team, per
+      once.film/pricing): a paid add-on, `brand_pack`, at a **placeholder price of $49 /
+      Rs 6,500** until the owner prices it. The host's logo and colour on every guest screen
+      (the colour must read at 4.5:1 on ink), the venue slideshow and the table cards; the
+      logo optionally on guests' copies of the photos (off by default, originals untouched);
+      photo terms guests tick to join, versioned, with the version and time each guest
+      agreed; the ZIP adds `manifest.csv` and `terms.txt`; the night in numbers with the most
+      loved photos. Self-serve on the web; the app shows it and links there. No email or lead
+      collection (needs its own privacy design)
 - [ ] Planner / venue white-label licensing
 
 ---

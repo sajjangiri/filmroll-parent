@@ -24,7 +24,7 @@ Legend:
 | Instant reveal mode (live gallery) | done | 3 | P1 | web, ios |
 | Extend time / raise cap mid-event | done | 3 | P1 | web, ios, android |
 | Change the develop time after create | done | 3 | P1 | web, ios, android |
-| Multiple rolls per event (ceremony / party) | todo | 6 | P2 | web, ios |
+| Multiple rolls per event (ceremony / party): timed, own shots, one QR and reveal | done | 6 | P2 | api, web, ios, android (editing on web) |
 | Duplicate a past film as a template | todo | 6 | P2 | web |
 | Archive / delete a film | done | 3 | P1 | web |
 | Guided create: three short steps on web, one screen in the app | done | 3 | P1 | web, ios, android |
@@ -112,7 +112,7 @@ Legend:
 |---|---|---|---|---|
 | Free tier (5 guests, full features) | done | 4 | P0 | api |
 | **Stripe Checkout on web, by guest cap** | done | 4 | P0 | web |
-| Local payment methods for Nepal (Khalti / eSewa) | todo | 4 | P0 | api, web |
+| Local payment methods for Nepal: Khalti built (fake + sandbox-ready; needs merchant keys and real NPR prices), eSewa not started | todo | 4 | P0 | api, web |
 | Server-side entitlement enforcement | done | 4 | P0 | api |
 | Upgrade cap mid-event | done | 4 | P1 | web, ios |
 | StoreKit 2 IAP (full app only) | todo | 5 | P1 | ios |
@@ -122,7 +122,7 @@ Legend:
 | Keep-forever storage after 12 months | done | 4 | P1 | web |
 | Photobook / prints | todo | 6 | P2 | web |
 | Planner / venue license, invoicing | todo | 6 | P2 | web |
-| Brand rights pack + event analytics | todo | 6 | P2 | web |
+| Brand pack: logo + colour on guest screens, optional logo on photos, versioned photo terms at join, usage manifest in the ZIP, event stats (placeholder price $49 / Rs 6,500) | done | 6 | P2 | api, web (bought + edited), ios/android (logo + terms at join; host row links to web) |
 
 ## 7. Platform / infrastructure
 
