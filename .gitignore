@@ -36,15 +36,12 @@ coverage/
 .env.*
 !.env.example
 
-# Nested application git directories. Source stays in this tree; do not ingest
-# another repo's objects, hooks, or index.
-web/.git/
-mobile/.git/
-backend/.git/
-
-# local prototype data, superseded by Postgres + MinIO
-web/data/
-web/public/uploads/
+# Each app is its own git repo with its own remote; commit and push inside it.
+# This workspace tracks only the cross-repo docs, so a push from an app folder
+# never leaves this tree showing stale changes.
+/web/
+/mobile/
+/backend/
 
 # celery beat writes its schedule into the bind-mounted source directory
 celerybeat-schedule*
@@ -52,6 +49,8 @@ celerybeat-schedule*
 # misc
 .DS_Store
 *.pem
+*secret*
+*credentials*
 
 # debug
 npm-debug.log*

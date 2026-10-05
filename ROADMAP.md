@@ -65,6 +65,9 @@ Goal: nothing is lost, nothing leaks, reveal is actually enforced.
 - [x] Host session: magic link email, replacing `localStorage` as the only copy
 - [x] Rate limiting + upload size/type validation + EXIF strip on public derivatives
 - [x] Structured logging: join funnel, upload success rate, queue depth
+- [x] Event-day dashboard (2026-10-05): `GET /v1/ops/summary` behind `OPS_TOKEN`,
+      shown at `/ops` on the web. Join and upload funnel per window, processing
+      backlog and queue depth, stack health, and every open or busy film
 
 **Done when:** a film survives a server restart, a guest cannot see a photo before
 reveal even with a direct URL, and two hosts creating films at once cannot clobber
@@ -82,7 +85,9 @@ This is the differentiator. Venue Wi-Fi is the enemy.
       or reopened — iOS will not run Background Sync)
 - [x] Visible queue state: "3 photos waiting to upload"
 - [x] Resumable upload: fresh presigned URL on each PUT retry (same shot id; JPEGs skip S3 multipart)
-- [x] Live filter preview via WebGL shader (look on preview only; originals stay clean)
+- [x] Live filter preview via WebGL shader, developed into the copies guests see and
+      save by the worker (originals stay clean for the ZIP)
+- [x] Optional date stamp printed on developed photos, toggled by the host
 - [x] Front/back camera switch
 - [x] Flash/torch and zoom
 - [x] Shot counter that feels like film ("8 left")
@@ -102,8 +107,12 @@ background; that is a platform limit, not a missing retry.
 - [x] **Moderation**: one-tap hide (and unhide), hidden photos never fan out
 - [x] Co-hosts (couple + planner) and a read-only photographer seat
 - [x] Print-ready QR table cards as PDF (table + signage sizes) plus a browser print page
+      (four cards to an A4 or Letter sheet, ink on white, cut along the dashes)
 - [x] Bulk **ZIP download of originals** (hidden shots omitted, media worker)
-- [x] Extend film time, raise guest cap, adjust shot limit mid-event
+- [x] Extend film time, raise guest cap, adjust shot limit mid-event (Extend never runs
+      past a fixed develop time on its own; change the develop time first)
+- [x] Change the develop time after create: when the camera closes, next morning at
+      10:00, or (web) any time after the close
 - [x] Reveal scheduling + "develop now"
 - [x] Instant reveal (live gallery from the first shot)
 - [x] Guest can delete their own photo
@@ -113,6 +122,16 @@ background; that is a platform limit, not a missing retry.
 - [x] Private vs shared gallery (default shared; private guests only see their own shots)
 - [x] Reveal notification (email) the morning after
 - [x] Reveal push to guests who joined from the app
+- [x] Remove a guest (2026-10-05, Once has it): their camera stops at once, their
+      seat goes back to the room, and their photos are hidden unless the host keeps
+      them. No accounts, so a removed person can scan again; a join PIN keeps them out
+- [x] Camera styles (2026-10-05, Once has it): warm, faded and mono. The film carries
+      its style's constants so the web viewfinder draws exactly what develops;
+      changeable until the album opens, re-rendering the roll like the date stamp
+- [x] Once-style "warm film" redesign of every screen from the approved prototype
+      (2026-10-04): web guest and host, app guest and host, the venue slideshow and
+      the print page. Same flows and API; new look, a landing page, a three-step
+      create on web and a one-screen create in the app
 - [ ] Ephemeral clip notification (Phase 5)
 
 **Done when:** a host can kill a bad photo in one tap before 150 phones see it.
@@ -173,19 +192,27 @@ for a JWT to expire.
 
 ---
 
-## Phase 4 — Money `DONE`
+## Phase 4 — Money `DONE` (Nepal payment methods open)
 
 Charge for **capacity and artifacts**, never per shutter press.
 
 - [x] Stripe Checkout on web for guest-cap tiers (free 5 → paid ladder)
+- [x] Re-priced against Once (2026-10-04): 10 guests $2.99, 25 $4.99, 50 $14.99,
+      100 $29.99, 150 $44.99, 250 $69.99; unlimited shots and video clips $9.99 each,
+      keep-forever $14.99. Level with Once where hosts compare, cheaper for big weddings
 - [x] Entitlement model: cap enforced server-side, upgrade mid-event
 - [x] Add-ons: unlimited shots
-- [x] Video pack add-on ($19: 3 clips per guest, up to 15s, on top of the photo roll)
+- [x] Video pack add-on ($9.99: 3 clips per guest, up to 15s, on top of the photo roll)
 - [x] Keep-forever add-on (12 months included otherwise; ZIP always free)
 - [x] Receipts, refunds, VAT/tax handling
 - [x] Storage policy that is honest: 12 months included, then paid keep-forever;
       host ZIP export always free
 - [x] Month-11 retention email
+- [ ] Local payment methods for Nepal (user requirement, 2026-10-05). Stripe does not
+      onboard businesses based in Nepal, so a Nepal-run Filmroll cannot take money through
+      the current Checkout at all. Likely Khalti and/or eSewa as a second provider on the
+      same `payments` table, with an NPR price ladder. Waiting on a short design, the
+      merchant accounts and NPR prices from the user
 
 **Why web-first billing:** Stripe on the web keeps ~97% of the price. Apple IAP takes
 15–30%. Selling the event on web and treating the app as the camera is the single
@@ -237,8 +264,18 @@ App Store download, and the same QR on Android opens the PWA.
       muted and hold the wall until they end; photos use the 1280 px derivative.
       Host dashboard and the mobile host Settings tab open the URL. A private
       gallery has no wall (the join QR stays up so guests can still shoot).
-- [ ] Recap video worker: 45–90s, music bed, face/motion selection
+- [ ] Recap video worker: 45–90s, music bed, face/motion selection. **Paused
+      2026-10-04 by the user:** it could change the business model, and the focus is
+      the photo loop. Guest video stays short clips with no music or editing
       (Once's is widely reviewed as too short — this is a real opening)
+- [x] Hearts in the album (2026-10-05, pulled forward; Once does not advertise likes): one per guest
+      per photo, counted but never named, a "Most loved" order, and counts in the
+      host inbox as the print shortlist
+- [x] Camera-roll upload (2026-10-05; Once lacks it, POV has it): a host toggle, off by
+      default. Each photo spends a shot from the same roll, and they are accepted after the
+      camera closes until the album opens. Clients re-encode the pick (GPS and all EXIF
+      gone, longest edge 4096 px) and send the photo's own date for the stamp. The host
+      inbox marks them. Not in the App Clip (no photo-library access there)
 - [ ] Multiple rolls per event (ceremony / cocktail / dance floor)
 - [ ] Photobook + print partner
 - [ ] Brand event pack: rights checkbox, usage export, analytics

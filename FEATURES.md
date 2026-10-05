@@ -22,10 +22,13 @@ Legend:
 | Guest cap | done | 0 | P0 | web, ios |
 | Short film code (6 chars, QR-friendly) | done | 0 | P0 | api |
 | Instant reveal mode (live gallery) | done | 3 | P1 | web, ios |
-| Extend time / raise cap mid-event | done | 3 | P1 | web, ios |
+| Extend time / raise cap mid-event | done | 3 | P1 | web, ios, android |
+| Change the develop time after create | done | 3 | P1 | web, ios, android |
 | Multiple rolls per event (ceremony / party) | todo | 6 | P2 | web, ios |
 | Duplicate a past film as a template | todo | 6 | P2 | web |
 | Archive / delete a film | done | 3 | P1 | web |
+| Guided create: three short steps on web, one screen in the app | done | 3 | P1 | web, ios, android |
+| Landing page that explains the film and starts one | done | 3 | P1 | web |
 
 ## 2. Guest join
 
@@ -43,6 +46,8 @@ Legend:
 | Geo or time-window lock | todo | 6 | P2 | api |
 | Guest list import (CSV) | todo | 6 | P2 | web |
 | Smart App Banner offering the iOS app | done | 5 | P1 | web |
+| "Your roll" home: shots left, upload state, develop countdown | done | 2 | P1 | web, ios, android |
+| Develop-time reminder (calendar file on web, reveal push in the app) | done | 3 | P1 | web, ios, android |
 
 ## 3. Camera + capture
 
@@ -58,9 +63,12 @@ Legend:
 | Front / back camera switch | done | 2 | P0 | web, ios, clip |
 | Flash / torch | done | 2 | P1 | web, ios |
 | Live filter preview (WebGL / Core Image) | done | 2 | P1 | web |
+| Film look developed into every guest copy (matches the preview) | done | 2 | P1 | api |
+| Camera styles: warm, faded, mono, changeable until the album opens | done | 3 | P1 | api, web, ios, android |
+| Optional date stamp on photos | done | 3 | P1 | api, web, ios, android |
 | Originals stored clean, look applied at display | done | 1 | P1 | api |
 | Idempotent shot IDs (no double burn) | done | 1 | P0 | api |
-| Camera-roll upload | todo | 6 | P2 | web, ios (**not** clip) |
+| Camera-roll upload (host toggle, spends a shot, until the album opens) | done | 6 | P2 | api, web, ios, android (**not** clip) |
 | Guest video clips (≤15s) | done | 6 | P2 | web, ios, android |
 
 ## 4. Reveal + gallery
@@ -74,11 +82,12 @@ Legend:
 | Thumbnail / display derivatives | done | 1 | P0 | api |
 | Bulk ZIP of originals | done | 3 | P1 | web, ios |
 | Guest saves a single photo | done | 3 | P1 | web, ios, android |
+| Full-screen photo viewer (swipe, save, report) | done | 3 | P1 | web, ios, android |
 | Reveal notification (email / push) | done | 3 | P1 | web, ios |
 | Ephemeral reveal notification (8h/24h) | todo | 5 | P2 | clip |
 | Live slideshow for a venue screen | done | 6 | P2 | web |
 | Recap video, 45–90s with music | todo | 6 | P2 | api |
-| Favorites / hearts | todo | 6 | P2 | web, ios |
+| Favorites / hearts | done | 6 | P2 | web, ios, android |
 
 ## 5. Host controls, trust and safety
 
@@ -89,6 +98,7 @@ Legend:
 | **One-tap hide / moderation queue** | done | 3 | P0 | web, ios |
 | Hidden photos never fan out | done | 3 | P0 | api |
 | Co-hosts | done | 3 | P1 | web, ios, android |
+| Remove a guest (camera stops, seat freed, photos hidden by default) | done | 3 | P1 | api, web, ios, android |
 | Photographer read-only seat | done | 3 | P2 | web, ios, android |
 | Guest deletes own photo | done | 3 | P1 | api |
 | Private vs shared visibility | done | 3 | P1 | web, ios |
@@ -102,6 +112,7 @@ Legend:
 |---|---|---|---|---|
 | Free tier (5 guests, full features) | done | 4 | P0 | api |
 | **Stripe Checkout on web, by guest cap** | done | 4 | P0 | web |
+| Local payment methods for Nepal (Khalti / eSewa) | todo | 4 | P0 | api, web |
 | Server-side entitlement enforcement | done | 4 | P0 | api |
 | Upgrade cap mid-event | done | 4 | P1 | web, ios |
 | StoreKit 2 IAP (full app only) | todo | 5 | P1 | ios |
@@ -125,7 +136,7 @@ Legend:
 | Installable PWA + service worker | done | 2 | P0 | web |
 | i18n (EN, ES, FR) | done | 2 | P1 | web, ios |
 | Accessibility pass (guest flow) | done | 2 | P1 | web, ios |
-| Event-day observability dashboards | todo | 1 | P1 | api |
+| Event-day observability dashboards | done | 1 | P1 | api, web |
 | AASA + assetlinks + `applinks:` entitlement | done | 5 | P1 | api, ios, android |
 | App Clip `appclips:` entitlement | todo | 5 | P1 | clip |
 | Android host app | done | 6 | P2 | android |
