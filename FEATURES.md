@@ -15,8 +15,10 @@ Legend:
 
 | Feature | Status | Phase | Pri | Surface |
 |---|---|---|---|---|
-| Create a film (name, cover, event type) | done | 0 | P0 | web, ios |
+| Create a film (name, event type) | done | 0 | P0 | web, ios |
+| Cover photo: picked and framed in the app's create flow or Settings; on the join card, Film ready, home rows and shared-link previews (`og:image` via `GET /v1/films/{code}/cover`) | done | 5 | P1 | api, web, ios, android |
 | Set how long the film stays open | done | 0 | P0 | web, ios |
+| Start later: a calendar start and end in the app; the film is one timed roll, guests can join early and see "Opens …" | done | 5 | P1 | api, ios, android (guest side on web too) |
 | Set reveal / develop time | done | 0 | P0 | web, ios |
 | Shots per guest (film roll size) | done | 0 | P0 | web, ios |
 | Guest cap | done | 0 | P0 | web, ios |
@@ -27,7 +29,7 @@ Legend:
 | Multiple rolls per event (ceremony / party): timed, own shots, one QR and reveal | done | 6 | P2 | api, web, ios, android (editing on web) |
 | Duplicate a past film as a template | todo | 6 | P2 | web |
 | Archive / delete a film | done | 3 | P1 | web |
-| Guided create: three short steps on web, one screen in the app | done | 3 | P1 | web, ios, android |
+| Guided create: three short steps on web; six in the app (name, when, when photos appear, look, cover, guests), Once-style, draft kept through an app kill | done | 5 | P1 | web, ios, android |
 | Landing page that explains the film and starts one | done | 3 | P1 | web |
 
 ## 2. Guest join
@@ -38,7 +40,7 @@ Legend:
 | Share link join | done | 0 | P0 | all |
 | No account, name only | done | 0 | P0 | all |
 | Guest identity persists on device | done | 0 | P0 | web, ios, clip |
-| **App Clip launch from QR (no download)** | todo | 5 | P1 | clip |
+| **App Clip launch from QR (no download)**: the clip is built (`mobile/targets/clip`); it goes live with the App Store app and an App Clip experience | todo | 5 | P1 | clip |
 | App Clip Codes (Apple visual code) | todo | 5 | P2 | clip |
 | NFC table tags | todo | 6 | P2 | ios, android |
 | Android/desktop fallback to PWA on same URL | done | 2 | P0 | web |
@@ -115,6 +117,7 @@ Legend:
 | Local payment methods for Nepal: Khalti built (fake + sandbox-ready; needs merchant keys and real NPR prices), eSewa not started | todo | 4 | P0 | api, web |
 | Server-side entitlement enforcement | done | 4 | P0 | api |
 | Upgrade cap mid-event | done | 4 | P1 | web, ios |
+| Pay for a guest size in the app: Stripe or Khalti in a browser sheet that comes back to the app (`return_to: "app"`, web `/app-return`); at create and from Settings → Make room. Store review: needs StoreKit / Play Billing or a per-storefront switch before submission | done | 5 | P1 | api, web, ios, android |
 | StoreKit 2 IAP (full app only) | todo | 5 | P1 | ios |
 | Unlimited-shots add-on | done | 4 | P1 | web, ios |
 | Video pack add-on | done | 4 | P2 | web (bought), ios/android (used) |
@@ -138,7 +141,8 @@ Legend:
 | Accessibility pass (guest flow) | done | 2 | P1 | web, ios |
 | Event-day observability dashboards | done | 1 | P1 | api, web |
 | AASA + assetlinks + `applinks:` entitlement | done | 5 | P1 | api, ios, android |
-| App Clip `appclips:` entitlement | todo | 5 | P1 | clip |
+| App Clip `appclips:` entitlement (from `app.json` applinks, `targets/clip/expo-target.config.js`) | done | 5 | P1 | clip |
+| Live film on the Lock Screen: iOS Live Activity (expo-widgets, countdown with no pushes), Android sticky notification; opt-in card per film, Settings switch | done | 5 | P1 | ios, android |
 | Android host app | done | 6 | P2 | android |
 
 ---

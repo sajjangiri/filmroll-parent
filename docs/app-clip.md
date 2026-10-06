@@ -67,7 +67,32 @@ every film. You do **not** register an experience per event.
 Serve this at `https://filmroll.app/.well-known/apple-app-site-association` with
 `Content-Type: application/json`, no redirects, no `.json` extension. FastAPI
 already serves it (`APPLE_TEAM_ID` defaults to the `TEAMID` placeholder until
-App Store Connect exists). The clip itself is still unbuilt.
+App Store Connect exists).
+
+## Where the clip lives (built 2026-10-06)
+
+`mobile/targets/clip/` holds the clip's SwiftUI sources. `@bacons/apple-targets`
+generates the `FilmrollClip` target (`app.filmroll.Clip`, iOS 16) into the
+git-ignored `ios/` at `npx expo prebuild`; never edit `ios/` by hand.
+
+- `expo-target.config.js`: type `clip`, `exportJs: false` (no React Native), the
+  `appclips:` domains mapped from `app.json`'s `applinks:`, the App Group
+  `group.app.filmroll` shared with the app and the Live Activity extension. It
+  writes the git-ignored `Generated.swift` with the API address from
+  `EXPO_PUBLIC_API_URL`, so no host is committed.
+- `Info.plist` (not managed by the plugin): camera usage string, dark style,
+  `NSAppClip` with ephemeral notifications off for now, local networking for
+  development.
+- `ClipModel.swift`: link → film → join (PIN, photo terms) → camera → shots
+  saved to disk and uploaded in the foreground (reserve → PUT → commit, the same
+  shot id on retry) → `SKOverlay` for the full app when the roll is used up or the
+  camera closes. It writes `clip-handoff.json` (code, guest token, name) to the
+  App Group; the full app adopts it on first launch (`mobile/src/clip-handoff.ts`).
+- In the Simulator, which has no camera, the shutter uses `assets/simulator-shot.jpg`.
+
+Card copy for the App Clip experience (App Store Connect): title "You're invited to
+the film", subtitle "Take photos together. They develop later.", action **Open**,
+header image 1800×1200 in the warm-film style. Not Once's wording.
 
 ```json
 {
@@ -205,7 +230,7 @@ simulate an invocation URL.
 - [ ] Clip binary verified under 15 MB uncompressed after thinning
 - [x] AASA served at `/.well-known/apple-app-site-association`, 200, no redirect
       (placeholder Team ID until App Store Connect exists)
-- [ ] `appclips:filmroll.app` in the clip's associated-domains entitlement
+- [x] `appclips:filmroll.app` in the clip's associated-domains entitlement (from `app.json`)
 - [ ] Advanced App Clip Experience created with prefix `https://filmroll.app/f/`
 - [ ] Card image, title, subtitle, and action verb set for the experience
 - [ ] `NSCameraUsageDescription` written in plain language
